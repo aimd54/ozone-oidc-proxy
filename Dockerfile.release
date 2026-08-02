@@ -1,0 +1,18 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Runtime image for released binaries. goreleaser supplies the already-built
+# proxy and credential portal, so nothing is compiled here; Dockerfile builds
+# from source for local work.
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
+
+COPY ozone-oidc-proxy /usr/local/bin/ozone-oidc-proxy
+COPY credential-portal /usr/local/bin/credential-portal
+
+# The gateway behind this proxy performs no authentication, so the proxy runs
+# unprivileged and exposes only its data and admin ports.
+USER nonroot:nonroot
+EXPOSE 9000 9090
+
+ENTRYPOINT ["/usr/local/bin/ozone-oidc-proxy"]

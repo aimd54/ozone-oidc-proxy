@@ -1,0 +1,133 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Release pipeline: static binaries for the proxy and its two companion
+# commands, SBOMs, checksums signed keylessly with cosign in CI, and the
+# distroless runtime image.
+
+version: 2
+
+project_name: ozone-oidc-proxy
+
+builds:
+  - id: proxy
+    main: ./cmd/proxy
+    binary: ozone-oidc-proxy
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+  # ozone-login runs on a person's machine, so it is built for the same
+  # platforms as the proxy rather than server targets only.
+  - id: ozone-login
+    main: ./cmd/ozone-login
+    binary: ozone-login
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+  # Built for the same platforms as the rest so every archive carries the same
+  # set of binaries. It is normally deployed on Linux behind oauth2-proxy, but
+  # running it locally while developing is reasonable.
+  - id: credential-portal
+    main: ./cmd/credential-portal
+    binary: credential-portal
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+
+signs:
+  # Keyless sigstore bundle over the checksum file, with the OIDC token coming
+  # from CI. cosign v3 writes signature, certificate, and transparency-log
+  # proof into one .sigstore.json bundle; verify with (cosign v3 or newer):
+  #   cosign verify-blob --bundle checksums.txt.sigstore.json \
+  #     --certificate-identity-regexp 'github.com/aimd54/ozone-oidc-proxy' \
+  #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  #     checksums.txt
+  # No `output: true` here: cosign writes the bundle itself, and its stdout
+  # (a legacy base64 signature) must not clobber it.
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --yes
+      - --bundle=${signature}
+      - ${artifact}
+    artifacts: checksum
+
+dockers_v2:
+  - id: proxy
+    ids: [proxy, credential-portal]
+    dockerfile: Dockerfile.release
+    images:
+      - ghcr.io/aimd54/ozone-oidc-proxy
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/aimd54/ozone-oidc-proxy
+      org.opencontainers.image.licenses: Apache-2.0
+      org.opencontainers.image.description: OIDC authentication for the Apache Ozone S3 Gateway
+
+changelog:
+  use: git
+  # Entries carry no commit hash; the release page already links the full
+  # comparison for anyone who wants it.
+  abbrev: -1
+  filters:
+    # Repository plumbing that changes nothing a consumer of the binaries can
+    # observe. Everything else, including build changes such as a minimum Go
+    # version bump, stays in the notes.
+    exclude:
+      - '^ci[:(]'
+      - '^chore[:(]'
+      - '^test[:(]'
+      - '^style[:(]'
+  groups:
+    - title: Features
+      regexp: '^feat'
+      order: 0
+    - title: Fixes
+      regexp: '^fix'
+      order: 1
+    - title: Documentation
+      regexp: '^docs'
+      order: 2
+    - title: Other
+      order: 999
+
+release:
+  footer: |
+    ---
+    Binaries are static (CGO disabled). The checksum file is signed with
+    cosign (keyless); see `.goreleaser.yaml` for the verify command.
+
+    This proxy authenticates requests to a gateway that authenticates none of
+    its own. Read `docs/PRODUCTION.md` before deploying it.

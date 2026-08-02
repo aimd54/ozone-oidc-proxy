@@ -30,3 +30,5 @@ deploy/compose/edge/certs/
 
 # Local working notes, never published.
 CLAUDE.md
+
+dist/
