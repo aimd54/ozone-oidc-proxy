@@ -1,0 +1,32 @@
+# Binaries
+/bin/
+/dist/
+# A stray root-level build output; anchored so it never matches the Helm chart
+# directory of the same name under deploy/helm/.
+/ozone-oidc-proxy
+*.exe
+
+# Go
+*.test
+*.out
+/vendor/
+
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+
+# Local environment
+.env
+*.local.yaml
+
+# OS
+.DS_Store
+deploy/compose/edge/certs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local working notes, never published.
+CLAUDE.md
