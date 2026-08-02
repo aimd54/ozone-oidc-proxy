@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # HA overlay config for replica A (docker-compose.ha.yml): identical to the
-# base proxy-config.yaml except the credential store moves to valkey (§6.5)
+# base proxy-config.yaml except the credential store moves to valkey
 # so both replicas share minted credentials. Forward mode stays "rewrite".
 listen: 0.0.0.0:9000
 admin_listen: 0.0.0.0:9090

@@ -8,7 +8,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.edge.yml up -d
 #
 # Clients: https://localhost:8443 from the host, https://haproxy:8443 on the
-# compose network — self-signed, so pass the CA (edge/certs/edge.crt) or
+# compose network, self-signed, so pass the CA (edge/certs/edge.crt) or
 # disable verification in lab tooling.
 name: ozone-oidc-proxy
 

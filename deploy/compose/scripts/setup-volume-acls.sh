@@ -2,15 +2,15 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Ozone-side ACL bootstrap (DESIGN.md §9.2), run inside the OM container:
+# Ozone-side ACL bootstrap (architecture.md), run inside the OM container:
 #   docker compose exec ozone-om bash /scripts/setup-volume-acls.sh
 #
 # Grants on the S3 volume /s3v:
-#   r (read) + l (list)    — required for any S3 traversal
-#   w (write) + c (create) — bucket creation through the S3 API: OM checks
+#   r (read) + l (list)   , required for any S3 traversal
+#   w (write) + c (create): bucket creation through the S3 API: OM checks
 #                            WRITE on the volume for CreateBucket (verified
-#                            against 2.1.1 via om-audit; §9.2)
-# Per-bucket grants stay per-user/per-bucket (see the e2e script and §9.2).
+#                            against 2.1.1 via om-audit;)
+# Per-bucket grants stay per-user/per-bucket (see the e2e script and).
 set -e
 
 if [ ! -x /opt/hadoop/bin/ozone ] && ! command -v ozone >/dev/null; then

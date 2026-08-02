@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command credential-portal is the human path to temporary S3 credentials
-// (DESIGN.md §11.4): it runs behind oauth2-proxy, which handles the OIDC
+// it runs behind oauth2-proxy, which handles the OIDC
 // browser login and forwards the user's access token; the portal exchanges
 // that token at the proxy's STS endpoint and renders the credentials with
 // copy-paste recipes. It replaces ROPC (curl with a password) for humans.
@@ -178,7 +178,7 @@ func bearerToken(r *http.Request) string {
 }
 
 // sessionName derives an STS-safe RoleSessionName from oauth2-proxy's user
-// headers ([A-Za-z0-9_=,.@-], 2..64 chars — internal/sts enforces the same).
+// headers ([A-Za-z0-9_=,.@-], 2..64 chars, internal/sts enforces the same).
 func sessionName(r *http.Request) string {
 	raw := r.Header.Get("X-Forwarded-Preferred-Username")
 	if raw == "" {
@@ -236,7 +236,7 @@ var page = template.Must(template.New("portal").Parse(`<!doctype html>
 <div class="err">{{.Error}}</div>
 <a class="again" href="/">Try again</a>
 {{else}}
-<p>Minted for <strong>{{.Username}}</strong> — valid until <strong>{{.Expiration}}</strong>. Reload to mint a fresh set.</p>
+<p>Minted for <strong>{{.Username}}</strong>, valid until <strong>{{.Expiration}}</strong>. Reload to mint a fresh set.</p>
 <table>
   <tr><td>AccessKeyId</td><td><code>{{.Creds.AccessKeyID}}</code></td></tr>
   <tr><td>SecretAccessKey</td><td><code>{{.Creds.SecretAccessKey}}</code></td></tr>

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package server dispatches incoming requests to the STS, Bearer and SigV4
-// lanes (DESIGN.md §6.1) and enforces strict mode: every data-path request is
+// lanes and enforces strict mode: every data-path request is
 // either a valid Bearer JWT or a verified temp-credential SigV4 request, or it
 // is rejected with S3-shaped error XML.
 package server
@@ -87,7 +87,7 @@ func New(cfg *config.Config, validator sts.TokenValidator, st store.Store, logge
 }
 
 // applyIdentity injects the authenticated username into the outbound request
-// per upstream.forward_mode (§6.4). auth is the client's verified header on
+// per upstream.forward_mode. auth is the client's verified header on
 // the SigV4 lane, nil elsewhere.
 func (s *Server) applyIdentity(r *http.Request, username string, auth *sigv4.Authorization) {
 	if s.cfg.Upstream.ForwardMode == config.ForwardModeResign {
@@ -127,8 +127,8 @@ func (s *Server) AdminHandler() http.Handler {
 		fmt.Fprintln(w, "ready")
 	})
 	mux.Handle("/metrics", promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{}))
-	// Revocation = store delete (§7, M3). This makes the admin listener
-	// state-changing and security-sensitive — it is deliberately
+	// Revocation is a store delete. This makes the admin listener
+	// state-changing and security-sensitive; it is deliberately
 	// unauthenticated, so it must never be published beyond an internal
 	// boundary (compose binds it to localhost; the Helm chart keeps it
 	// ClusterIP behind a NetworkPolicy scoped to the scrape source).
@@ -168,7 +168,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	start := s.now()
 	reqID := newRequestID()
 
-	// STS endpoint: POST / with a form body (MinIO-style dispatch, §6.1).
+	// STS endpoint: POST / with a form body (MinIO-style dispatch).
 	if s.isSTSRequest(r) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxSTSBodyBytes)
 		s.stsHandler.ServeHTTP(w, r)
@@ -277,8 +277,8 @@ func (s *Server) serveSigV4(w http.ResponseWriter, r *http.Request, authHeader, 
 		Now:       s.now(),
 		ClockSkew: s.cfg.Security.SigV4ClockSkew.Std(),
 	})
-	// The §11.5 histogram covers the pure verification work (store lookup,
-	// token compare, signature recompute) — not logging or header rewriting.
+	// The histogram covers the pure verification work (store lookup,
+	// token compare, signature recompute): not logging or header rewriting.
 	s.metrics.observeVerification("sigv4", vstart)
 	if err != nil {
 		switch {
@@ -306,7 +306,7 @@ func (s *Server) serveSigV4(w http.ResponseWriter, r *http.Request, authHeader, 
 	s.proxy.ServeHTTP(w, r)
 }
 
-// servePresigned is the query-auth variant of the SigV4 lane (§6.3, M2):
+// servePresigned is the query-auth variant of the SigV4 lane:
 // credentials travel in the query string and the fetch is typically done by a
 // bare HTTP client (browser, curl) that knows nothing about SigV4. After
 // verification the auth parameters are stripped and the synthetic header
@@ -397,7 +397,7 @@ func (s *Server) serveUnauthenticated(w http.ResponseWriter, r *http.Request, re
 		return
 	}
 	// Non-strict: pass through untouched. This trusts anyone who can reach the
-	// proxy with whatever identity Ozone infers — for lab setups only.
+	// proxy with whatever identity Ozone infers, for lab setups only.
 	log.Warn("unauthenticated request forwarded (strict mode disabled)")
 	s.proxy.ServeHTTP(w, r)
 }

@@ -49,7 +49,7 @@ func TestSealOpenRoundTrip(t *testing.T) {
 	}
 
 	// Tampering, wrong keys and a wrong AAD (a record grafted onto another
-	// store key, §7 F4) must fail, and short inputs must not panic.
+	// store key) must fail, and short inputs must not panic.
 	sealed[len(sealed)-1] ^= 1
 	if _, err := open(aead, sealed, aad); err == nil {
 		t.Error("tampered value decrypted")
@@ -120,7 +120,7 @@ func TestValkeyLiveRoundTrip(t *testing.T) {
 		}
 	}
 
-	// F4: the record is AAD-bound to its AKID — grafting the raw ciphertext
+	// F4: the record is AAD-bound to its AKID, grafting the raw ciphertext
 	// onto another key must fail decryption, not impersonate.
 	grafted := "OZPXGRAFTEDRECORD000"
 	if err := v.client.Do(ctx, v.client.B().Set().Key(valkeyPrefix+grafted).
@@ -164,7 +164,7 @@ func waitGone(t *testing.T, v *Valkey, akid, msg string) {
 	}
 }
 
-// TestValkeyLiveInvalidation proves the §6.5 design point: a Delete through
+// TestValkeyLiveInvalidation proves the design point: a Delete through
 // one client invalidates another client's local cache (server-assisted CSC),
 // so revocation propagates across replicas within the invalidation push, not
 // the cache TTL.

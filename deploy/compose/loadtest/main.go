@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command loadtest drives SigV4 GET traffic through the proxy and checks the
-// §11.5 exit criterion: verification overhead p99 < 1 ms, read from the
+// Verification overhead target: p99 under 1 ms, read from the
 // proxy's verification_duration_seconds histogram (bucket-delta method, so
 // only this run's samples count). It signs requests with the proxy's own
-// sigv4 package — no AWS SDK involved.
+// sigv4 package, no AWS SDK involved.
 //
 // Part of the main module (it imports internal/sigv4); test/deploy tooling,
 // not shipped in the production image.

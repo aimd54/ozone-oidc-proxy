@@ -5,7 +5,7 @@
 # Lakehouse-overlay smoke checks: Nessie is healthy and version-storing,
 # its web-identity token file is being refreshed, the Iceberg REST facade
 # answers, and Jupyter is serving. The full walkthrough (including actual
-# table writes over OIDC credentials) is the notebook —
+# table writes over OIDC credentials) is the notebook,
 #   docker compose exec jupyter jupyter nbconvert --to notebook --execute \
 #       ozone-oidc-tour.ipynb --output /tmp/executed.ipynb
 set -uo pipefail
@@ -19,7 +19,7 @@ ok() { printf '  \033[0;32mPASS\033[0m %s\n' "$1"; PASS=$((PASS + 1)); }
 ko() { printf '  \033[0;31mFAIL\033[0m %s\n' "$1"; shift; [ $# -gt 0 ] && printf '       %s\n' "$@"; FAIL=$((FAIL + 1)); }
 curl_net() { docker run --rm --network "$NETWORK" "$CURL_IMAGE" -s "$@"; }
 
-echo "lakehouse smoke — nessie + iceberg REST + jupyter"
+echo "lakehouse smoke, nessie + iceberg REST + jupyter"
 
 CFG=$(curl_net http://nessie:19120/api/v2/config)
 grep -q '"defaultBranch"' <<<"$CFG" && ok "nessie API v2 answers (defaultBranch present)" \

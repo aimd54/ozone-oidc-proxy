@@ -15,7 +15,7 @@ COMPOSE_LAKE    = $(COMPOSE) -f deploy/compose/docker-compose.lakehouse.yml
 COMPOSE_ALL     = $(COMPOSE_PORTAL) -f deploy/compose/docker-compose.ha.yml -f deploy/compose/docker-compose.monitor.yml -f deploy/compose/docker-compose.edge.yml -f deploy/compose/docker-compose.lakehouse.yml
 
 help:
-	@echo "ozone-oidc-proxy — OIDC authentication for the Apache Ozone S3 Gateway"
+	@echo "ozone-oidc-proxy, OIDC authentication for the Apache Ozone S3 Gateway"
 	@echo ""
 	@echo "Development:"
 	@echo "  make build         - Build proxy, ozone-login and credential-portal into bin/"
@@ -100,7 +100,7 @@ loadtest:
 portal-up: docker-build
 	$(COMPOSE_PORTAL) up -d --wait credential-portal oauth2-proxy || ($(COMPOSE_PORTAL) ps; exit 1)
 	@echo ""
-	@echo "Portal: http://localhost:4180 — the browser must resolve 'keycloak'"
+	@echo "Portal: http://localhost:4180, the browser must resolve 'keycloak'"
 	@echo "(add '127.0.0.1 keycloak' to /etc/hosts)."
 
 portal-down:
@@ -119,7 +119,7 @@ ha-down:
 monitor-up:
 	$(COMPOSE_MONITOR) up -d --wait prometheus grafana || ($(COMPOSE_MONITOR) ps; exit 1)
 	@echo ""
-	@echo "Grafana: http://localhost:3000 (anonymous viewer) — dashboard 'Ozone OIDC Proxy'."
+	@echo "Grafana: http://localhost:3000 (anonymous viewer): dashboard 'Ozone OIDC Proxy'."
 	@echo "Drive traffic (make e2e / make loadtest) to populate the panels."
 
 monitor-down:
@@ -138,7 +138,7 @@ edge-down:
 	$(COMPOSE_EDGE) rm -sf haproxy
 
 # Lakehouse overlay: Nessie (Iceberg REST) + Postgres + Jupyter. Nessie
-# authenticates to Ozone S3 with OIDC web-identity credentials — no static
+# authenticates to Ozone S3 with OIDC web-identity credentials, no static
 # S3 secret anywhere. Needs the base stack + make init.
 lakehouse-up:
 	$(COMPOSE) exec -T ozone-om bash /scripts/setup-lakehouse-acls.sh

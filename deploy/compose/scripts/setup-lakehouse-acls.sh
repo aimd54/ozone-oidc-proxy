@@ -8,7 +8,7 @@
 # Nessie authenticates through the proxy as the Keycloak service account
 # `service-account-nessie` (client-credentials grant → STS web identity);
 # alice writes Iceberg data files with her own credentials. Both need the
-# volume traversal grants (§9.2) plus full access to the warehouse bucket.
+# volume traversal grants plus full access to the warehouse bucket.
 set -e
 
 if [ ! -x /opt/hadoop/bin/ozone ] && ! command -v ozone >/dev/null; then

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package sts implements the AssumeRoleWithWebIdentity token exchange
-// (DESIGN.md §6.2): validate an OIDC JWT, mint temporary credentials bound to
+// (architecture.md, "STS"): validate an OIDC JWT, mint temporary credentials bound to
 // the mapped username, and answer with AWS-shaped XML so stock AWS SDKs and
 // CLIs work unchanged.
 package sts

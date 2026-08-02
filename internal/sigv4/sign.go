@@ -16,8 +16,8 @@ import (
 // signedHeaderNames returns the header set Sign covers, in canonical
 // (alphabetical) order: host plus every x-amz-* header on the request. SigV4
 // requires all x-amz-* headers to be signed, and strict parsers (Ozone's
-// included) reject requests where one — e.g. x-amz-decoded-content-length on
-// aws-chunked uploads — is present but unsigned. Everything else passes
+// included) reject requests where one, e.g. x-amz-decoded-content-length on
+// aws-chunked uploads, is present but unsigned. Everything else passes
 // unsigned, so bodies and client headers stream through untouched.
 func signedHeaderNames(r *http.Request) []string {
 	names := []string{"host"}
@@ -31,7 +31,7 @@ func signedHeaderNames(r *http.Request) []string {
 }
 
 // SignInput describes an outbound signing operation. Used by forward's resign
-// mode (DESIGN.md §6.4) and by the e2e load generator as a client-side signer.
+// mode and by the e2e load generator as a client-side signer.
 type SignInput struct {
 	Request     *http.Request
 	AccessKeyID string

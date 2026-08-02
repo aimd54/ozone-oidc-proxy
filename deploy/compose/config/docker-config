@@ -1,5 +1,5 @@
 # Ozone cluster configuration (env-var convention: OZONE-SITE.XML_key=value).
-# Single-node sizing adapted from the validated PoC stack.
+# Single-node sizing for the local stack.
 
 # Core
 CORE-SITE.XML_fs.defaultFS=ofs://om
@@ -17,7 +17,7 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
-# Single-node PoC sizing
+# Single-node lab sizing
 OZONE-SITE.XML_ozone.server.default.replication=1
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.block.size=1MB
@@ -33,7 +33,7 @@ OZONE-SITE.XML_hdds.scm.safemode.min.datanode=1
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
-# Trust model (DESIGN.md §9.1): no Kerberos, identity comes from the parsed
+# Trust model (architecture.md): no Kerberos, identity comes from the parsed
 # access key ID (injected by the proxy); OM still evaluates native ACLs.
 OZONE-SITE.XML_ozone.security.enabled=false
 OZONE-SITE.XML_ozone.acl.enabled=true

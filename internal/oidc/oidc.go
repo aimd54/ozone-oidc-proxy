@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package oidc validates OIDC JWTs from multiple configured issuers
-// (DESIGN.md §6.2): exact iss match, JWKS signature verification with
+// exact iss match, JWKS signature verification with
 // refresh-on-unknown-kid, algorithm allowlist, exp/nbf with skew, mandatory
 // audience intersection, username-claim extraction and sanitization.
 package oidc
@@ -106,7 +106,7 @@ type discardErrSink struct{}
 
 func (discardErrSink) Error(error) {}
 
-// Validate runs the full §6.2 chain and returns the mapped identity.
+// Validate runs the full validation chain and returns the mapped identity.
 func (v *Validator) Validate(ctx context.Context, raw string) (*Identity, error) {
 	if raw == "" {
 		return nil, fmt.Errorf("%w: empty token", ErrTokenInvalid)

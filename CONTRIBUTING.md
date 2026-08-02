@@ -5,10 +5,9 @@ the project easy to review, audit, and maintain.
 
 This proxy is a security boundary: it decides who may act as whom against a
 storage cluster that performs no authentication of its own. Review here leans
-on the conservative side, and changes that touch authentication, signature
-verification or identity injection are held to the invariants in
-[CLAUDE.md](CLAUDE.md) and the threat model in
-[docs/DESIGN.md](docs/DESIGN.md) §7.
+conservative, and changes touching authentication, signature verification, or
+identity injection are held to the threat model in
+[docs/architecture.md](docs/architecture.md).
 
 ## Developer Certificate of Origin (DCO)
 
@@ -65,8 +64,8 @@ What that means in practice:
 
 - Unit tests next to the code, in the same package for unexported behaviour.
 - **Time-dependent code takes an injectable clock** (`WithClock` / `Now`
-  fields) and is tested at the boundaries — expiry, clock skew, presigned
-  validity windows — rather than with `time.Sleep`.
+  fields) and is tested at the boundaries, expiry, clock skew, presigned
+  validity windows, rather than with `time.Sleep`.
 - **Signature work is pinned to external references**: the SigV4 package is
   checked against the official AWS test-suite vector, the AWS documentation's
   presigned example, and a round-trip against the real `aws-sdk-go-v2` signer.
@@ -93,13 +92,13 @@ What that means in practice:
 
 - Implementation lives under `internal/`; there is no exported Go API.
 - **Never log secrets.** Usernames, access key IDs, issuers and error codes
-  are fine; secret keys, session tokens and raw JWTs are not — in logs or in
+  are fine; secret keys, session tokens and raw JWTs are not, in logs or in
   error strings.
 - Errors that cross package boundaries are wrapped sentinel errors
   (`oidc.ErrTokenExpired`, `sigv4.ErrSignatureMismatch`, ...) matched with
   `errors.Is`, so the HTTP layer can map them to the right S3 error code.
-- Design decisions live in [docs/DESIGN.md](docs/DESIGN.md), which the code
-  cross-references by section (§6.2, §6.4, ...). A significant design change
+- Design decisions live in [docs/architecture.md](docs/architecture.md), which the code
+  cross-references by section (...). A significant design change
   updates that document in the same pull request, keeping the section
   references accurate.
 

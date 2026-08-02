@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package store holds the temporary credentials minted by the STS handler and
-// looked up by the SigV4 data path (DESIGN.md §6.2 minting, §6.5 store).
+// looked up by the SigV4 data path.
 package store
 
 import (
@@ -27,7 +27,7 @@ type Credentials struct {
 func (c Credentials) Expired(now time.Time) bool { return !now.Before(c.ExpiresAt) }
 
 // Store is the credential store interface. The memory implementation serves a
-// single replica (M1); a valkey implementation is planned for HA (M3).
+// single replica; the valkey implementation is the shared alternative.
 type Store interface {
 	// Put stores creds, replacing any record with the same AccessKeyID.
 	Put(ctx context.Context, creds Credentials) error

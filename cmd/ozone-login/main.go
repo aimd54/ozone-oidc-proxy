@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command ozone-login signs a human in via the OAuth 2.0 device flow and
-// keeps a web-identity token file fresh (DESIGN.md §6.9): point
+// keeps a web-identity token file fresh: point
 // AWS_WEB_IDENTITY_TOKEN_FILE at the file it maintains and every AWS
 // SDK/CLI exchanges it against the proxy's STS endpoint automatically.
 //

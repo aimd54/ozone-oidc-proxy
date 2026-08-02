@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Monitoring overlay (M3, DESIGN.md §8/§11.5): Prometheus scrapes the proxy's
+# Monitoring overlay (architecture.md): Prometheus scrapes the proxy's
 # :9090 /metrics; Grafana auto-provisions the datasource and the committed
 # dashboard (deploy/dashboards/ozone-oidc-proxy.json). Usage:
 #
@@ -31,7 +31,7 @@ services:
       - "3000:3000"
     environment:
       # Lab-only: anonymous read access, no login, no sign-up. Do not reuse
-      # this posture outside the PoC.
+      # this posture outside a lab.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_DISABLE_LOGIN_FORM: "true"

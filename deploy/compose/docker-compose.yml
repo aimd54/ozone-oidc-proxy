@@ -1,10 +1,10 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# PoC stack for ozone-oidc-proxy (DESIGN.md §11.3, milestone M1):
+# Lab stack for ozone-oidc-proxy (architecture.md):
 # Keycloak (OIDC IdP) + stock Apache Ozone 2.1.1 + the proxy.
 #
-# Trust boundary (§7): the S3 Gateway publishes NO host port — the proxy is
+# Trust boundary: the S3 Gateway publishes NO host port, the proxy is
 # the only way in. Keycloak's KC_HOSTNAME is pinned so tokens always carry
 # iss=http://keycloak:8080/realms/ozone no matter where the token request
 # came from (host or container).
@@ -23,7 +23,7 @@ services:
       KC_HOSTNAME: http://keycloak:8080
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
     ports:
-      - "8080:8080" # token endpoint (ROPC in the PoC); UI needs a host alias for "keycloak"
+      - "8080:8080" # token endpoint (ROPC in the lab); UI needs a host alias for "keycloak"
     healthcheck:
       # Health endpoints live on the management port (9000) in Keycloak 26.
       test:
@@ -123,8 +123,8 @@ services:
     networks:
       - oidc-net
 
-  # Second OIDC issuer (M2, DESIGN.md §11.4): a static stub standing in for a
-  # proprietary IdP — discovery + JWKS + an UNAUTHENTICATED /token mint.
+  # Second OIDC issuer (architecture.md): a static stub standing in for a
+  # proprietary IdP, discovery + JWKS + an UNAUTHENTICATED /token mint.
   # Test-only, internal-only: no published port; anyone who can reach /token
   # can mint arbitrary identities for the "stub" issuer.
   stub-issuer:
@@ -149,7 +149,7 @@ services:
     ports:
       - "9000:9000" # S3 + STS (the only public data endpoint)
       # Admin: /healthz /readyz /metrics AND the state-changing revocation
-      # DELETE — localhost only (never LAN-exposed). Prometheus scrapes
+      # DELETE, localhost only (never LAN-exposed). Prometheus scrapes
       # proxy:9090 over the compose network, so this bind does not affect it.
       - "127.0.0.1:9090:9090"
     depends_on:
@@ -175,7 +175,7 @@ services:
       AUDIENCE: ozone-s3
       ACCESS_TOKEN_LIFESPAN: "3600"
       PORTAL_CLIENT_ID: ozone-portal
-      PORTAL_CLIENT_SECRET: portal-secret-123 # PoC only; overlay uses the same
+      PORTAL_CLIENT_SECRET: portal-secret-123 # lab only; overlay uses the same
       PORTAL_REDIRECT_URI: http://localhost:4180/oauth2/callback
     depends_on:
       keycloak:

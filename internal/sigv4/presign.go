@@ -1,8 +1,8 @@
 // Copyright The ozone-oidc-proxy Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Query-string ("presigned URL") SigV4 authentication — the M2 half of
-// DESIGN.md §6.3. Same wire-form discipline as header auth: the canonical
+// Query-string ("presigned URL") SigV4 authentication.
+// Same wire-form discipline as header auth: the canonical
 // query is rebuilt from the raw query bytes with X-Amz-Signature left out,
 // and the payload hash is the literal UNSIGNED-PAYLOAD the S3 query-auth
 // scheme prescribes (the signer cannot know the payload when the URL is

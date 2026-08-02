@@ -51,7 +51,7 @@
       "id": 2,
       "type": "stat",
       "title": "SigV4 verification p99",
-      "description": "p99 of the pure verification step, sigv4 lane (DESIGN.md §11.5 target: < 1 ms). Number turns red above the 1 ms SLO.",
+      "description": "p99 of the pure verification step, sigv4 lane (architecture.md target: < 1 ms). Number turns red above the 1 ms SLO.",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [
@@ -167,7 +167,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Request rate by lane",
-      "description": "Lane dispatch split (DESIGN.md §6.1). One color per lane, fixed.",
+      "description": "Lane dispatch split (architecture.md). One color per lane, fixed.",
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [
@@ -260,7 +260,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "SigV4 verification latency",
-      "description": "Pure verification step, sigv4 lane. Ordinal percentile ramp; the red line is the 1 ms SLO (DESIGN.md §11.5).",
+      "description": "Pure verification step, sigv4 lane. Ordinal percentile ramp; the red line is the 1 ms SLO (architecture.md).",
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [
@@ -356,7 +356,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "SigV4 verification outcomes",
-      "description": "Data-path SigV4 results by rate. Success is green; every error result (mismatch, unknown_akid, expired, bad_token, ...) shares the critical red — the legend names which.",
+      "description": "Data-path SigV4 results by rate. Success is green; every error result (mismatch, unknown_akid, expired, bad_token, ...) shares the critical red, the legend names which.",
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [

@@ -2,7 +2,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Load test (DESIGN.md §11.5 exit criterion): drives SigV4 GET traffic through
+# Load test (architecture.md exit criterion): drives SigV4 GET traffic through
 # the proxy and fails unless the proxy-side verification overhead p99 stays
 # under 1 ms (read from the verification_duration_seconds histogram).
 #

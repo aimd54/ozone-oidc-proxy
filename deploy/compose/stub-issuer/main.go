@@ -1,8 +1,8 @@
 // Copyright The ozone-oidc-proxy Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// stub-issuer is a minimal static OIDC issuer for the compose PoC only
-// (DESIGN.md §11.4: "second issuer — OIDC stub standing in for the
+// stub-issuer is a minimal static OIDC issuer for the compose lab only
+// (a second issuer, an OIDC stub standing in for the
 // proprietary endpoint"). It proves the proxy's multi-issuer registry,
 // OIDC discovery and per-issuer audiences/username_claim against a
 // non-Keycloak discovery shape.
@@ -15,7 +15,7 @@
 //	              ttl (seconds, default 600) → {"access_token": ..., ...}
 //
 // SECURITY: /token mints an RS256 JWT for any requested identity with no
-// authentication whatsoever — that is the point of a test stub. It must
+// authentication whatsoever; that is the point of a test stub. It must
 // never be reachable outside the lab network (compose publishes no port).
 package main
 

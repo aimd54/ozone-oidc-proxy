@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package forward carries authenticated requests to the Ozone S3 Gateway with
-// the proxy's identity injection (DESIGN.md §6.4): either a fully synthetic
+// the proxy's identity injection: either a fully synthetic
 // SigV4 header (Bearer lane) or the client's own header with the access key ID
 // swapped for the username (SigV4 lane). Ozone's stock header parser populates
 // SignatureInfo from it and OM evaluates native ACLs against that username;
@@ -40,7 +40,7 @@ func ApplySynthetic(r *http.Request, username, region string, now time.Time) {
 	r.Header.Del("X-Amz-Security-Token")
 }
 
-// ResignSecret signs re-signed upstream headers (§6.4 resign mode). It is
+// ResignSecret signs re-signed upstream headers in resign mode. It is
 // deliberately not secret: Ozone's unsecured mode never validates signatures,
 // the value only makes the forwarded header internally consistent (robust to
 // parser hardening). A future secure-mode deployment would provision a real
@@ -50,9 +50,9 @@ func ApplySynthetic(r *http.Request, username, region string, now time.Time) {
 const ResignSecret = "ozone-oidc-proxy-resign"
 
 // ApplyResign replaces the request's authentication with a freshly computed,
-// fully valid SigV4 header attributing it to username (§6.4, forward_mode
-// "resign"). The signature covers the upstream host — the value the reverse
-// proxy rewrites Host to — so a verifying upstream could actually check it.
+// fully valid SigV4 header attributing it to username (forward_mode
+// "resign"). The signature covers the upstream host, the value the reverse
+// proxy rewrites Host to; so a verifying upstream could actually check it.
 // The client's declared payload hash is preserved (streaming bodies keep
 // working); an error can only come from an unparseable query string.
 func ApplyResign(r *http.Request, username, upstreamHost, region string, now time.Time) error {

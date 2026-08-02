@@ -15,5 +15,5 @@
 - [ ] Commit messages follow Conventional Commits
 - [ ] `make check` passes locally
 - [ ] Tests cover the change, including the failure paths
-- [ ] Docs updated where behavior changed (DESIGN.md section refs stay accurate)
+- [ ] Docs updated where behavior changed (architecture.md section refs stay accurate)
 - [ ] No secrets, tokens or raw JWTs added to logs or error messages

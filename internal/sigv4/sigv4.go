@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package sigv4 verifies AWS Signature Version 4 on incoming requests against
-// secrets minted by the STS handler (DESIGN.md §6.3). The canonical request is
+// secrets minted by the STS handler. The canonical request is
 // rebuilt from the wire: the URI as received, the payload hash exactly as the
 // client declared it (UNSIGNED-PAYLOAD / STREAMING-* pass through verbatim, so
 // bodies are never buffered and only streaming seed signatures are checked).
@@ -26,7 +26,7 @@ import (
 const (
 	// Algorithm is the only supported signing algorithm.
 	Algorithm = "AWS4-HMAC-SHA256"
-	// emptyBodySHA256 is sha256("") — used when the client did not declare a
+	// emptyBodySHA256 is sha256(""): used when the client did not declare a
 	// payload hash (plain GETs from generic SigV4 clients).
 	emptyBodySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	// amzDateFormat is ISO8601 basic, the X-Amz-Date wire format.
@@ -199,7 +199,7 @@ func canonicalRequest(r *http.Request, signedHeaders []string) (string, error) {
 }
 
 // buildCanonical assembles the canonical request. skipQueryKey (decoded form)
-// is omitted from the canonical query — query authentication excludes
+// is omitted from the canonical query, query authentication excludes
 // X-Amz-Signature from its own canonical form.
 func buildCanonical(r *http.Request, signedHeaders []string, skipQueryKey, payloadHash string) (string, error) {
 	query, err := canonicalQuery(r.URL.RawQuery, skipQueryKey)
@@ -224,7 +224,7 @@ func buildCanonical(r *http.Request, signedHeaders []string, skipQueryKey, paylo
 }
 
 // canonicalURI returns the request path exactly as it appeared on the wire
-// (single-encoded, not normalized — the S3 flavor of SigV4).
+// (single-encoded, not normalized, the S3 flavor of SigV4).
 func canonicalURI(r *http.Request) string {
 	uri := r.RequestURI
 	if uri == "" {

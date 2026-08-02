@@ -70,7 +70,7 @@ REVOKE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE http://127.0.0.1:19090
 
 NP=$(kubectl get networkpolicy -o name)
 grep -q "$RELEASE-ozone-oidc-proxy-ingress" <<<"$NP" && ok "proxy ingress NetworkPolicy rendered" || ko "proxy ingress NetworkPolicy rendered"
-grep -q "$RELEASE-ozone-oidc-proxy-s3g-lockdown" <<<"$NP" && ok "s3g lockdown NetworkPolicy rendered (§7)" || ko "s3g lockdown NetworkPolicy rendered"
+grep -q "$RELEASE-ozone-oidc-proxy-s3g-lockdown" <<<"$NP" && ok "s3g lockdown NetworkPolicy rendered" || ko "s3g lockdown NetworkPolicy rendered"
 grep -q "$RELEASE-ozone-oidc-proxy-valkey" <<<"$NP" && ok "valkey NetworkPolicy rendered" || ko "valkey NetworkPolicy rendered"
 
 if [ "$FAIL" -gt 0 ]; then

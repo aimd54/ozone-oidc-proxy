@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # End-to-end test suite for the compose stack: the M1 exit criteria of
-# DESIGN.md §11.3 plus M2 checks — presigned URLs, the multipart matrix
-# (2.1.1 ListParts/ListMultipartUploads ACL enforcement, §9.2), the human
+# architecture.md plus M2 checks, presigned URLs, the multipart matrix
+# (2.1.1 ListParts/ListMultipartUploads ACL enforcement,), the human
 # credential UX, the second issuer (stub IdP) and client smoke tests
 # (boto3, mc, s3a). Run from anywhere after `make up && make init`:
 #
@@ -41,7 +41,7 @@ expect_ok() {
     if out=$("$@" 2>&1); then ok "$desc"; else ko "$desc" "$out"; fi
 }
 
-# expect_fail_with <description> <needle> <command...> — command must fail AND
+# expect_fail_with <description> <needle> <command...>, command must fail AND
 # its combined output must contain the needle.
 expect_fail_with() {
     local desc="$1" needle="$2"; shift 2
@@ -72,7 +72,7 @@ aws_as() {
     aws_run "${env_args[@]}" -- "$@"
 }
 
-# aws_vol <hostdir> <AKID> <SECRET> <SESSION> <aws args...> — aws_as with
+# aws_vol <hostdir> <AKID> <SECRET> <SESSION> <aws args...>, aws_as with
 # <hostdir> mounted at /work (multipart bodies, downloads).
 aws_vol() {
     local dir="$1" akid="$2" secret="$3" session="$4"; shift 4
@@ -96,7 +96,7 @@ exchange() { # <jwt> → "AKID SECRET SESSION" on stdout
 
 b64url() { base64 -w0 | tr '+/' '-_' | tr -d '='; }
 
-echo "ozone-oidc-proxy e2e — bucket: $BUCKET"
+echo "ozone-oidc-proxy e2e, bucket: $BUCKET"
 
 step "Token acquisition (Keycloak ROPC)"
 ALICE_TOKEN=$(get_token alice password123)
@@ -138,9 +138,9 @@ expect_ok "alice: aws s3 mb s3://$BUCKET" \
 
 OWNER=$($COMPOSE exec -T ozone-om ozone sh bucket info "/s3v/$BUCKET" 2>/dev/null | jq -r '.owner // empty')
 if [ "$OWNER" = "alice" ]; then
-    ok "bucket owner attributed to OIDC user (owner=alice) — synthetic header accepted by stock 2.1.1"
+    ok "bucket owner attributed to OIDC user (owner=alice): synthetic header accepted by stock 2.1.1"
 else
-    ko "bucket owner attributed to OIDC user" "owner='$OWNER' (day-0 check §11.1#1 failed)"
+    ko "bucket owner attributed to OIDC user" "owner='$OWNER' (day-0 check#1 failed)"
 fi
 
 echo "hello from the oidc proxy" | aws_as "$A_AKID" "$A_SECRET" "$A_SESSION" s3 cp - "s3://$BUCKET/hello.txt" >/dev/null 2>&1 \
@@ -330,7 +330,7 @@ if docker ps --format '{{.Names}}' | grep -q '^oidc-oauth2-proxy$'; then
     expect_ok "portal credentials work on the data path (aws s3 ls)" \
         aws_as "$P_AKID" "$P_SECRET" "$P_TOKEN" s3 ls
 else
-    echo "  SKIP portal checks (overlay not running — make portal-up)"
+    echo "  SKIP portal checks (overlay not running, make portal-up)"
 fi
 
 step "Second issuer (stub IdP, multi-issuer registry)"
@@ -378,8 +378,8 @@ grep -q "InvalidIdentityToken" <<<"$STS_ERR" \
 
 step "Client smoke tests (boto3, mc, s3a)"
 # Three real clients, containerized (first run pulls python:3.12-slim,
-# minio/mc and apache/hadoop:3.4.1 — the last is ~2 GB; boto3 is pip-installed
-# in the container, so this step needs egress). boto3 proves the §6.9 env-var
+# minio/mc and apache/hadoop:3.4.1, the last is ~2 GB; boto3 is pip-installed
+# in the container, so this step needs egress). boto3 proves the env-var
 # web-identity auto-exchange; mc proves MC_HOST session-token aliases and
 # streaming SigV4 uploads (STREAMING-AWS4-HMAC-SHA256-PAYLOAD seed
 # signature); s3a (Hadoop 3.4 / AWS SDK v2) is the heaviest real consumer.
@@ -389,7 +389,7 @@ step "Client smoke tests (boto3, mc, s3a)"
 printf '%s' "$ALICE_TOKEN" > "$WORK/token.jwt"
 cat > "$WORK/boto3_smoke.py" <<'PYEOF'
 """Credentials must come from botocore's own web-identity auto-exchange
-(AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE + AWS_ENDPOINT_URL_STS) —
+(AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE + AWS_ENDPOINT_URL_STS),
 no explicit keys anywhere."""
 import sys
 
@@ -512,7 +512,7 @@ if docker ps --format '{{.Names}}' | grep -q '^oidc-proxy-b$'; then
         && ok "credentials survive a replica restart (valkey persistence)" \
         || ko "credentials survive a replica restart (valkey persistence)"
 else
-    echo "  SKIP HA checks (overlay not running — make ha-up)"
+    echo "  SKIP HA checks (overlay not running, make ha-up)"
 fi
 
 step "TLS edge (HAProxy overlay)"
@@ -535,7 +535,7 @@ if docker ps --format '{{.Names}}' | grep -q '^oidc-haproxy$'; then
     [ "$EDGE_ANON" = "403" ] && ok "strict 403 preserved through the edge" \
         || ko "strict 403 preserved through the edge" "http $EDGE_ANON"
 else
-    echo "  SKIP TLS edge checks (overlay not running — make edge-up)"
+    echo "  SKIP TLS edge checks (overlay not running, make edge-up)"
 fi
 
 step "Strict mode (no anonymous fallback)"

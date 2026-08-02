@@ -1,7 +1,7 @@
 // Copyright The ozone-oidc-proxy Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package config loads and validates the proxy configuration (DESIGN.md §6.6):
+// Package config loads and validates the proxy configuration:
 // a YAML file, a small set of OZPX_* environment overrides, defaults, and
 // fail-fast validation so that a misconfigured proxy never starts.
 package config
@@ -19,18 +19,18 @@ import (
 )
 
 // ForwardModeRewrite forwards the client request with the Authorization header
-// rewritten (synthetic header / AKID substitution, §6.4).
+// rewritten (synthetic header and AKID substitution).
 const ForwardModeRewrite = "rewrite"
 
 // ForwardModeResign replaces the Authorization header with a freshly computed,
-// internally consistent SigV4 signature toward the upstream (§6.4, M3) —
+// internally consistent SigV4 signature toward the upstream,
 // robust to upstream parser hardening.
 const ForwardModeResign = "resign"
 
 // StoreMemory is the in-process credential store (single replica).
 const StoreMemory = "memory"
 
-// StoreValkey is the shared HA credential store (§6.5, M3): encrypted values
+// StoreValkey is the shared credential store: encrypted values
 // in valkey, multi-replica capable.
 const StoreValkey = "valkey"
 
@@ -115,7 +115,7 @@ type CredentialStore struct {
 }
 
 // ValkeyStore configures the valkey credential store. The AES-256 value
-// encryption key is read from the environment variable named by key_env —
+// encryption key is read from the environment variable named by key_env,
 // key material never lives in the config file.
 type ValkeyStore struct {
 	Addr   string `yaml:"addr"`
@@ -288,7 +288,7 @@ func (c *Config) validate() error {
 				return err
 			}
 		}
-		// aud verification is mandatory (DESIGN.md §6.2): an empty list would
+		// aud verification is mandatory: an empty list would
 		// silently accept any audience, the classic Keycloak gap.
 		if len(iss.Audiences) == 0 {
 			return fmt.Errorf("%s (%s): audiences must not be empty", where, iss.Name)

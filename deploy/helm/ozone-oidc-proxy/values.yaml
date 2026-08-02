@@ -15,7 +15,7 @@ service:
 
 # Rendered verbatim as the proxy's config.yaml (see repository README for the
 # full reference). Multi-replica deployments need credential_store.type
-# "valkey" — with "memory" every replica has its own store and SigV4
+# "valkey", with "memory" every replica has its own store and SigV4
 # verification fails on whichever replica did not mint the credentials.
 config:
   listen: 0.0.0.0:9000
@@ -60,11 +60,11 @@ valkey:
 networkPolicy:
   # Emits (1) an ingress+egress policy for the proxy (S3/STS from anywhere,
   # the admin port only from adminIngress below; egress limited to DNS, the
-  # S3 Gateway, valkey and the issuers — F3), (2) the §7 lockdown for the S3
-  # Gateway — ingress exclusively from proxy pods — and (3) a valkey
+  # S3 Gateway, valkey and the issuers, F3), (2) the lockdown for the S3
+  # Gateway, ingress exclusively from proxy pods, and (3) a valkey
   # policy when the in-chart valkey is enabled.
   enabled: true
-  # Sources allowed to reach the admin port (:9090) — health, metrics AND the
+  # Sources allowed to reach the admin port (:9090): health, metrics AND the
   # state-changing revocation DELETE. This is NOT the whole namespace: it
   # renders verbatim as the `from:` peers of the admin ingress rule. Point it
   # at your Prometheus's pod labels. FAIL CLOSED: an empty list renders no
@@ -85,7 +85,7 @@ networkPolicy:
   #  component: s3g
   s3gPort: 9878
   # F3 egress toward the issuers (OIDC discovery + JWKS). Default: any peer
-  # on issuerEgressPorts — tighten to your IdP's ipBlock/namespace where the
+  # on issuerEgressPorts, tighten to your IdP's ipBlock/namespace where the
   # network allows it, e.g.
   #   issuerEgress:
   #     - ipBlock: { cidr: 10.20.30.0/24 }

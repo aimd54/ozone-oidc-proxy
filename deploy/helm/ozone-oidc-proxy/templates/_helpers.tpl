@@ -19,7 +19,7 @@ app.kubernetes.io/name: {{ include "ozone-oidc-proxy.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Proxy pods only — the component label keeps the proxy Service and
+{{/* Proxy pods only, the component label keeps the proxy Service and
      NetworkPolicies from also matching the in-chart valkey pods, which share
      the name/instance labels. */}}
 {{- define "ozone-oidc-proxy.proxySelectorLabels" -}}

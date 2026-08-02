@@ -588,7 +588,7 @@ sts: {max_duration: 3600}
 `
 
 // verifyResigned asserts the forwarded request carries a fully valid SigV4
-// header signed with the resign secret and attributed to username (§6.4).
+// header signed with the resign secret and attributed to username.
 func verifyResigned(t *testing.T, fwd *http.Request, username string) {
 	t.Helper()
 	auth, err := sigv4.ParseAuthorization(fwd.Header.Get("Authorization"))

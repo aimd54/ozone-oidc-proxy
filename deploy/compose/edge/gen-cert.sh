@@ -2,7 +2,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Self-signed certificate for the HAProxy TLS edge overlay — the lab
+# Self-signed certificate for the HAProxy TLS edge overlay, the lab
 # stand-in for the production edge's real certificate. Produces
 # certs/edge.pem (key+cert combined, the format HAProxy expects) and keeps
 # certs/edge.crt as the CA bundle clients can pin (curl --cacert,

@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Credential-portal overlay (DESIGN.md §11.4): oauth2-proxy + portal on top
+# Credential-portal overlay (architecture.md): oauth2-proxy + portal on top
 # of the base stack. Usage:
 #
 #   make portal-up      # docker compose -f docker-compose.yml -f docker-compose.portal.yml ...
@@ -36,7 +36,7 @@ services:
       - ./config/oauth2-proxy.cfg:/etc/oauth2-proxy/config.cfg:ro
     environment:
       OAUTH2_PROXY_CLIENT_ID: ozone-portal
-      # PoC-only fixed secrets; init.py provisions the matching client.
+      # Lab-only fixed secrets; init.py provisions the matching client.
       OAUTH2_PROXY_CLIENT_SECRET: portal-secret-123
       OAUTH2_PROXY_COOKIE_SECRET: "0123456789abcdef0123456789abcdef"
     depends_on:

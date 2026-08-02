@@ -1,9 +1,9 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Scrapes the proxy admin listener (:9090 /metrics, DESIGN.md §8). Both
+# Scrapes the proxy admin listener (:9090 /metrics, architecture.md). Both
 # replicas are listed; proxy-b is only up under the HA overlay, so it simply
-# reads DOWN otherwise — the dashboard aggregates across instances either way.
+# reads DOWN otherwise, the dashboard aggregates across instances either way.
 global:
   scrape_interval: 5s
   evaluation_interval: 5s

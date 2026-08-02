@@ -2,16 +2,16 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Provision Keycloak for the ozone-oidc-proxy PoC stack.
+"""Provision Keycloak for the ozone-oidc-proxy lab stack.
 
 Creates (idempotently):
   - realm `ozone`
-  - public client `ozone-s3` with Direct Access Grants (ROPC, PoC only) and
+  - public client `ozone-s3` with Direct Access Grants (ROPC, lab only) and
     the OAuth device grant (ozone-login), an *audience mapper* adding
     aud=ozone-s3 (Keycloak's default aud=account would fail the proxy's
-    mandatory audience check, DESIGN.md §6.2), and a 1h access-token
+    mandatory audience check, architecture.md), and a 1h access-token
     lifespan so temp-credential TTLs aren't capped at the realm default of
-    5 minutes (§6.9)
+    5 minutes
   - confidential client `ozone-portal` for oauth2-proxy in front of the
     credential portal (authorization code flow; same aud=ozone-s3 mapper so
     the forwarded access token passes the proxy's STS)
@@ -114,7 +114,7 @@ def upsert_client(kc, config):
 
 
 def ensure_audience_mapper(kc, uuid, client_id):
-    """Access tokens must carry aud=ozone-s3 or the proxy rejects them (§6.2)."""
+    """Access tokens must carry aud=ozone-s3 or the proxy rejects them."""
     mappers_url = (f"{KEYCLOAK_URL}/admin/realms/{REALM}/clients/{uuid}"
                    "/protocol-mappers/models")
     mapper = {
@@ -141,10 +141,10 @@ def ensure_audience_mapper(kc, uuid, client_id):
 def create_client(kc):
     uuid = upsert_client(kc, {
         "clientId": CLIENT_ID,
-        "name": "Ozone S3 (proxy PoC)",
+        "name": "Ozone S3 (proxy lab)",
         "enabled": True,
         "protocol": "openid-connect",
-        # Public + ROPC: PoC-only convenience (DESIGN.md decision #5); the
+        # Public + ROPC: a lab-only convenience; the
         # portal and ozone-login are the human paths since M2. The device
         # grant serves ozone-login.
         "publicClient": True,
@@ -177,7 +177,7 @@ def create_portal_client(kc):
 def create_nessie_client(kc):
     """Machine identity for the lakehouse overlay: Nessie exchanges a
     client-credentials token (preferred_username=service-account-nessie)
-    for temp S3 credentials at the proxy STS — no static S3 secret."""
+    for temp S3 credentials at the proxy STS, no static S3 secret."""
     uuid = upsert_client(kc, {
         "clientId": NESSIE_CLIENT_ID,
         "name": "Nessie catalog (service account, lakehouse overlay)",

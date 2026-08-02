@@ -53,7 +53,7 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestFullExample(t *testing.T) {
-	// The example from DESIGN.md §6.6 must parse as-is.
+	// The documented example configuration must parse as-is.
 	cfg, err := Parse([]byte(`
 listen: 0.0.0.0:9000
 admin_listen: 0.0.0.0:9090

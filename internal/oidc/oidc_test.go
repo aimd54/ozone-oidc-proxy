@@ -243,7 +243,7 @@ func TestValidateRejections(t *testing.T) {
 	})
 	t.Run("wrong audience", func(t *testing.T) {
 		spec := baseSpec(idp)
-		spec.aud = []string{"account"} // Keycloak default aud — must be rejected
+		spec.aud = []string{"account"} // Keycloak default aud, must be rejected
 		_, err := v.Validate(ctx, idp.sign(t, idp.rsaKey, jwa.RS256, spec))
 		if !errors.Is(err, ErrTokenInvalid) {
 			t.Fatalf("want ErrTokenInvalid (aud), got %v", err)

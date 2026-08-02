@@ -6,48 +6,53 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 OIDC authentication for the [Apache Ozone](https://ozone.apache.org/) S3
-Gateway, as an external Go reverse proxy. Ozone's S3 API natively supports
-only Kerberos-backed SigV4 (secure mode) or no validation at all (unsecured
-mode); this proxy adds standards-based OIDC on top of a **stock, unmodified**
-Ozone 2.1.1:
+Gateway, as an external Go reverse proxy. Ozone's S3 API authenticates one of
+two ways: Kerberos-backed SigV4 in secure mode, or nothing at all in unsecured
+mode. This proxy adds standards-based OIDC in front of a stock, unmodified
+Ozone.
 
-- **STS token exchange** — an AWS-compatible `AssumeRoleWithWebIdentity`
-  endpoint turns an OIDC JWT (Keycloak or any OIDC issuer, multi-issuer
-  capable) into temporary AWS-style credentials. Standard tooling (aws cli,
-  boto3, Java SDK/s3a, minio-go, mc) consumes it natively, auto-refresh
+- **STS token exchange.** An AWS-compatible `AssumeRoleWithWebIdentity`
+  endpoint turns an OIDC token into temporary AWS-style credentials. Standard
+  tooling consumes it natively, auto-refresh included: aws cli, boto3, the Java
+  SDK and s3a, minio-go, mc. Any OIDC issuer works, and several at once.
+- **SigV4 data path.** Requests signed with those temporary credentials are
+  verified by the proxy, recomputing the signature from the wire and comparing
+  in constant time, then forwarded to Ozone. Header auth and presigned URLs
+  both work, so `aws s3 presign` links are shareable.
+- **Bearer data path.** `Authorization: Bearer <token>` works directly, for
+  people, browsers, and clients that would rather not sign.
+- **Native ACLs.** The proxy injects the authenticated username into the header
+  shape Ozone parses, so the Ozone Manager attributes every request to that
+  user and enforces the grants it already understands, bucket ownership
   included.
-- **SigV4 data path** — requests signed with those temporary credentials are
-  verified by the proxy (signature recomputed from the wire, constant-time
-  compare) and forwarded to Ozone. Both header auth and **presigned URLs**
-  (query auth) work, so `aws s3 presign` links are shareable.
-- **Bearer data path** — `Authorization: Bearer <jwt>` works directly for
-  humans, browsers and custom clients.
-- **Native ACLs** — the proxy injects the OIDC username into the header shape
-  Ozone parses, so the Ozone Manager attributes every request to that user and
-  enforces `ozone sh ... addacl` grants (bucket ownership included).
-- **Strict** — anything that is not a valid Bearer token or verified
-  temp-credential SigV4 request is rejected with S3-shaped 403 XML.
+- **Strict by default.** Anything that is not a valid bearer token or a
+  verified temporary-credential SigV4 request is refused with S3-shaped 403
+  XML.
 
-> **Scope and status.** This is an **Apache Ozone–specific** tool, not a
-> generic S3 gateway — it relies on how Ozone attributes requests in unsecured
-> mode, which is not how other S3 implementations behave
-> ([why](#why-ozone-only)). It is a **proof of concept**: everything claimed
-> here is verified live against stock Ozone 2.1.1
-> ([docs/VERIFICATION.md](docs/VERIFICATION.md)), but the security review was a
-> self-review and the project has no production track record. Read
-> [docs/PRODUCTION.md](docs/PRODUCTION.md) before running it anywhere real.
-> Not affiliated with or endorsed by the Apache Software Foundation.
+> **Scope.** This is an Apache Ozone-specific tool rather than a generic S3
+> gateway. It relies on how Ozone attributes requests in unsecured mode, which
+> is not how other S3 implementations behave ([why](#why-ozone-only)). Not
+> affiliated with or endorsed by the Apache Software Foundation.
+>
+> **Status.** Pre-1.0 and under active development. Everything claimed here is
+> verified live against a stock Ozone release
+> ([docs/VERIFICATION.md](docs/VERIFICATION.md)). The security review to date
+> has been a self-review and the project has no production track record, so
+> read [docs/PRODUCTION.md](docs/PRODUCTION.md) before running it anywhere
+> real.
 
-The full rationale, threat model and roadmap live in
-[docs/DESIGN.md](docs/DESIGN.md). Current status: milestones **M1, M2 and M3**
-— STS exchange, SigV4 (header, presigned, streaming uploads), Bearer lane,
-strict mode, multipart, multi-issuer, human credential UX (`ozone-login`
-device flow, credential portal), client smoke tests (boto3, mc, s3a), and the
-M3 hardening set: a **valkey**-backed credential store with two replicas, the
-`resign` forward mode, an admin **revocation** endpoint, a **Helm chart** with
-§7 NetworkPolicies, and a Prometheus + Grafana monitoring overlay — all
-verified end-to-end against stock Ozone 2.1.1; see
-[docs/VERIFICATION.md](docs/VERIFICATION.md).
+The rationale, threat model, and trust boundaries are in
+[docs/architecture.md](docs/architecture.md); what is shipped and what is
+planned is in [docs/roadmap.md](docs/roadmap.md).
+
+Working today: the STS exchange; SigV4 over header, presigned, and streaming
+uploads; the bearer lane; strict mode; multipart; multiple issuers; human
+credential flows through `ozone-login` device login and the credential portal;
+a valkey-backed credential store with replicas; the `resign` forward mode; an
+administrative revocation endpoint; a Helm chart with network policies; and a
+Prometheus and Grafana overlay. Clients are smoke-tested with boto3, mc, and
+s3a. All of it is exercised against a running cluster rather than asserted;
+see [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 ```txt
                       ┌────────────────────────────────────────┐
@@ -56,7 +61,7 @@ verified end-to-end against stock Ozone 2.1.1; see
                       │                                        │
  (3a) SigV4 S3 ──────▶│  verify sig ─┐                         │
  (3b) Bearer S3 ─────▶│  verify JWT ─┴─▶ synthetic header ─────┼──▶ Ozone S3G :9878
-                      │              Credential=<username>/...   │    (stock 2.1.1, internal-only,
+                      │              Credential=<username>/...   │    (stock Ozone, internal-only,
                       └────────────────────────────────────────┘     ACLs on, security off)
 ```
 
@@ -66,10 +71,10 @@ Requirements: Docker (compose v2), `curl`, `jq`, GNU make. ~6 GB RAM for the
 stack. The aws CLI is run containerized by the test suite.
 
 ```bash
-make up      # build the proxy image, start Keycloak + Ozone 2.1.1 + proxy
+make up      # build the proxy image, start Keycloak + Ozone + proxy
 make init    # provision Keycloak (realm ozone, client ozone-s3, alice/bob)
              # and grant alice/bob rwlc on the /s3v volume
-make e2e     # run the acceptance suite (M1 exit criteria + M2 checks)
+make e2e     # run the acceptance suite
 ```
 
 Endpoints after `make up`:
@@ -77,7 +82,7 @@ Endpoints after `make up`:
 | URL                     | What                                                                                            |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `http://localhost:9000` | S3 **and** STS (the only public data endpoint)                                                  |
-| `http://127.0.0.1:9090` | admin: `/healthz`, `/readyz`, `/metrics`, and `DELETE /credentials/{akid}` — **localhost only** |
+| `http://127.0.0.1:9090` | admin: `/healthz`, `/readyz`, `/metrics`, and `DELETE /credentials/{akid}`, **localhost only** |
 | `http://localhost:8080` | Keycloak (admin/admin123)                                                                       |
 
 The Ozone S3 Gateway is intentionally **not** published: with
@@ -106,7 +111,7 @@ bin/ozone-login -issuer http://keycloak:8080/realms/ozone
 
 It writes `~/.ozone/token.jwt` (atomic, 0600), refreshes it at two thirds
 of the token lifetime, and prints the exports every AWS SDK/CLI needs to
-auto-exchange against the proxy (DESIGN.md §6.9):
+auto-exchange against the proxy (architecture.md):
 
 ```bash
 export AWS_ROLE_ARN=arn:ozone:iam::dev:role/oidc
@@ -170,12 +175,12 @@ credential TTL).
 ### Other clients (boto3, mc, s3a)
 
 Anything that understands AWS temporary credentials works (all three below
-are smoke-tested in e2e). boto3 picks up the same env vars as the aws CLI —
+are smoke-tested in e2e). boto3 picks up the same env vars as the aws CLI, so
 including the web-identity auto-exchange. For mc and s3a, pass the minted
 credentials explicitly:
 
 ```bash
-# minio mc — the session token goes inside the alias URL
+# minio mc: the session token goes inside the alias URL
 export MC_HOST_ozone="http://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY:$AWS_SESSION_TOKEN@localhost:9000"
 mc ls ozone/demo
 
@@ -190,13 +195,13 @@ hadoop fs \
 ```
 
 Streaming uploads (`STREAMING-AWS4-HMAC-SHA256-PAYLOAD`, aws-chunked) pass
-through the proxy verified — mc and the AWS SDK v2 use them by default on
+through the proxy verified; mc and the AWS SDK v2 use them by default on
 plain HTTP.
 
 ### Granting access (Ozone native ACLs)
 
 Buckets created through the proxy belong to the OIDC user. Cross-user grants
-use plain Ozone ACLs (DESIGN.md §9.2):
+use plain Ozone ACLs (architecture.md):
 
 ```bash
 docker compose -f deploy/compose/docker-compose.yml exec ozone-om \
@@ -240,21 +245,21 @@ username_policy:
   pattern: "^[A-Za-z0-9._@-]{1,64}$"   # rejects '/' and '$' by design
 ```
 
-Keycloak note: default tokens carry `aud=account`, which the proxy rejects —
+Keycloak note: default tokens carry `aud=account`, which the proxy rejects, so
 the realm client needs an audience mapper (the compose init service creates
-one; DESIGN.md §6.2).
+one; architecture.md).
 
-**Forward mode** (`upstream.forward_mode`, DESIGN.md §6.4): `rewrite` (default)
+**Forward mode** (`upstream.forward_mode`, architecture.md): `rewrite` (default)
 swaps the AKID in the incoming `Authorization` header for the OIDC username and
-leaves the rest — the leanest path, and all stock Ozone 2.1.1 needs. `resign`
+leaves the rest. That is the leanest path, and all a stock Ozone needs. `resign`
 computes a *fresh, fully valid* SigV4 header toward Ozone (signed over the
 upstream host, `Credential=<username>/...`); it costs one extra signature but is
 robust to a future upstream that parses signatures strictly. It signs with a
 public constant today, so it adds parser-robustness, **not** upstream
-authentication — a secure-mode Ozone would need a real shared secret.
+authentication; a secure-mode Ozone would need a real shared secret.
 
 **Credential store** (`credential_store.type`): `memory` (single replica; TTL
-sweeper) or `valkey` (shared across replicas — required for more than one). For
+sweeper) or `valkey` (shared across replicas, and required for more than one). For
 `valkey`, values are AES-256-GCM encrypted with a 32-byte key the proxy reads
 from the env var named by `key_env` (base64; **never** in the YAML or logs):
 
@@ -277,7 +282,7 @@ honored on the other and a revocation on one propagates to the other.
 
 ### Revoking a credential
 
-The admin listener exposes a revocation endpoint (network-internal — same
+The admin listener exposes a revocation endpoint (network-internal, on the same
 trust zone as `/metrics`):
 
 ```bash
@@ -327,9 +332,9 @@ PyIceberg table on `s3://lakehouse/` and its Nessie commit history.
 ### Kubernetes (Helm)
 
 `deploy/helm/ozone-oidc-proxy/` is a deployable chart: Deployment, Service,
-ConfigMap, an optional store-key Secret and in-chart valkey, and the §7
+ConfigMap, an optional store-key Secret and in-chart valkey, and the
 NetworkPolicies that make the network the trust boundary (the S3 Gateway
-accepts traffic **only** from proxy pods — rendered when you set
+accepts traffic **only** from proxy pods, rendered when you set
 `networkPolicy.s3gPodSelector`).
 
 ```bash
@@ -356,17 +361,20 @@ Contributing (DCO sign-off, `make check`, testing policy):
 [CONTRIBUTING.md](CONTRIBUTING.md). Security reporting and scope:
 [SECURITY.md](SECURITY.md).
 
-Repository map and contributor invariants: see [CLAUDE.md](CLAUDE.md);
-milestones and their exit criteria: DESIGN.md §11. Production checklist and
-the Ranger note: [docs/PRODUCTION.md](docs/PRODUCTION.md); upstream OIDC/STS
-tracking: [docs/UPSTREAM.md](docs/UPSTREAM.md).
+Further reading: [docs/architecture.md](docs/architecture.md) for how the
+pieces fit and what is trusted where, [docs/adr/](docs/adr/README.md) for the
+decisions and their reasoning, [docs/roadmap.md](docs/roadmap.md) for what is
+shipped and what is planned, [docs/PRODUCTION.md](docs/PRODUCTION.md) for the
+production checklist and the Ranger note, and
+[docs/UPSTREAM.md](docs/UPSTREAM.md) for the upstream OIDC and STS work this
+tracks.
 
 ## Why Ozone only?
 
 The proxy authenticates the client itself, then hands Ozone a request whose
 `Credential=<username>/...` field carries the OIDC identity. In unsecured mode
 Ozone *attributes* that request to the username and enforces its native ACLs
-without verifying the signature (DESIGN.md §4.1) — that property is what makes
+without verifying the signature, and that property is what makes
 per-user authorization possible without touching Ozone at all.
 
 Other S3 implementations do not behave that way:

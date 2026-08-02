@@ -1,14 +1,14 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# HA overlay (M3, DESIGN.md §6.5/§11.5): valkey-backed credential store shared
+# HA overlay (architecture.md): valkey-backed credential store shared
 # by two proxy replicas. Replica A keeps forward_mode "rewrite"; replica B runs
-# "resign" so both §6.4 modes are exercised live.
+# "resign" so both modes are exercised live.
 #
 #   make ha-up      # docker compose -f docker-compose.yml -f docker-compose.ha.yml ...
 #
-# OZPX_STORE_KEY is the AES-256 value-encryption key (§6.5) — fixed here for
-# the PoC only; production injects a real secret (Helm chart uses a Secret).
+# OZPX_STORE_KEY is the AES-256 value-encryption key: fixed here for
+# the lab only; production injects a real secret (the Helm chart uses a Secret).
 services:
   valkey:
     image: valkey/valkey:8
@@ -27,7 +27,7 @@ services:
     volumes:
       - ./config/proxy-config-ha.yaml:/etc/ozone-oidc-proxy/config.yaml:ro
     environment:
-      OZPX_STORE_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" # PoC only
+      OZPX_STORE_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" # lab only
     depends_on:
       valkey:
         condition: service_healthy
@@ -38,10 +38,10 @@ services:
     volumes:
       - ./config/proxy-config-ha-b.yaml:/etc/ozone-oidc-proxy/config.yaml:ro
     environment:
-      OZPX_STORE_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" # PoC only
+      OZPX_STORE_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" # lab only
     ports:
       - "9001:9000" # S3 + STS, replica B
-      # Admin incl. the revocation DELETE — localhost only (see the base
+      # Admin incl. the revocation DELETE, localhost only (see the base
       # compose file); scraped over the network, not this host bind.
       - "127.0.0.1:9091:9090" # admin (healthz/metrics/revocation), replica B
     depends_on:

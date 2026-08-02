@@ -3,13 +3,13 @@
 #
 # Lakehouse overlay (modeled on the user's lakehouse-for-fun stack):
 # Nessie (Iceberg REST catalog) + Postgres (version store) + a light Jupyter
-# with PyIceberg — everything talking S3 through the OIDC proxy.
+# with PyIceberg, everything talking S3 through the OIDC proxy.
 #
 # The point: Nessie carries NO static S3 secret. A sidecar keeps a Keycloak
 # client-credentials JWT fresh in a shared volume, and the AWS SDK's default
 # credentials chain (auth-type=APPLICATION_GLOBAL) auto-exchanges it at the
 # proxy STS (AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE +
-# AWS_ENDPOINT_URL_STS) — the same §6.9 flow the boto3 smoke test proves.
+# AWS_ENDPOINT_URL_STS): the same flow the boto3 smoke test proves.
 #
 #   make lakehouse-up     (needs: make up && make init first)
 name: ozone-oidc-proxy

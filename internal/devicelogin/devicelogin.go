@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package devicelogin implements the OAuth 2.0 Device Authorization Grant
-// (RFC 8628) against an OIDC issuer, plus token refresh — the guts of the
+// (RFC 8628) against an OIDC issuer, plus token refresh, the guts of the
 // ozone-login helper that keeps AWS_WEB_IDENTITY_TOKEN_FILE fresh
-// (DESIGN.md §6.9). Only the access token ever touches disk; refresh tokens
+// Only the access token ever touches disk; refresh tokens
 // stay in process memory.
 package devicelogin
 

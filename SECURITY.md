@@ -31,37 +31,36 @@ absence of a note means no known vulnerability was addressed.
 
 This proxy is an authentication boundary in front of an Ozone cluster running
 with `ozone.security.enabled=false`, where **anything that reaches the S3
-Gateway can act as any user** (see [docs/DESIGN.md](docs/DESIGN.md) §4.1, §7).
+Gateway can act as any user** (see [docs/architecture.md](docs/architecture.md)).
 Anything that lets a caller obtain an identity it should not have is in scope
 and highly appreciated:
 
-- **Authentication bypass** — any request that reaches the upstream gateway
+- **Authentication bypass**: any request that reaches the upstream gateway
   without a valid Bearer token or a verified temporary-credential SigV4
   signature, in either forward mode.
-- **Signature verification weaknesses** — canonicalization mismatches between
+- **Signature verification weaknesses**: canonicalization mismatches between
   what is verified and what is forwarded, presigned-URL replay past its
   expiry, session tokens accepted for the wrong access key ID, or any
   non-constant-time comparison of signatures or tokens.
-- **Token validation weaknesses** — algorithm confusion, missing or bypassed
+- **Token validation weaknesses**: algorithm confusion, missing or bypassed
   `aud`/`iss`/`exp` checks, JWKS poisoning or key-rotation races.
-- **Identity injection flaws** — anything that lets a caller influence the
-  username written into the synthetic `Authorization` header (§6.4),
+- **Identity injection flaws**: anything that lets a caller influence the
+  username written into the synthetic `Authorization` header,
   including username-sanitation escapes (`/` and `$` are rejected by design).
-- **Credential-store issues** — plaintext or relocatable records in valkey,
+- **Credential-store issues**: plaintext or relocatable records in valkey,
   store-key handling, or revocation that fails to propagate.
 - **Secret leakage** through logs, error responses or metrics.
 
 Out of scope, because they are documented properties rather than defects:
 
-- Per-chunk streaming signatures are not verified; the seed signature is
-  (§6.3).
+- Per-chunk streaming signatures are not verified; the seed signature is.
 - `resign` mode signs with a public constant and provides parser robustness,
-  **not** upstream authentication (§6.4).
+  **not** upstream authentication.
 - The admin listener (`:9090`) is unauthenticated by design and must be kept
   internal; the compose stack binds it to localhost and the Helm chart puts it
   behind a NetworkPolicy.
 - Reaching the Ozone S3 Gateway directly, bypassing the proxy: preventing that
-  is the deployment's job (§7, [docs/PRODUCTION.md](docs/PRODUCTION.md)).
+  is the deployment's job ([docs/PRODUCTION.md](docs/PRODUCTION.md)).
 - The compose stack and its Keycloak realm, the stub issuer, the self-signed
   edge certificate and the Jupyter notebook are a **lab**: they ship insecure
   defaults on purpose (password grants, an unauthenticated token mint, no TLS
@@ -69,7 +68,9 @@ Out of scope, because they are documented properties rather than defects:
 
 ## Project status
 
-This is a proof of concept. Its security review to date has been a
-self-review, recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md), and
+Pre-1.0 and under active development. The security review to date has been a
+self-review, recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md), and the
+project has no production track record;
 [docs/PRODUCTION.md](docs/PRODUCTION.md) lists what a real deployment still
-needs. Independent review is very welcome.
+needs. Independent review is very welcome, and findings against the guarantees
+above are the most useful kind.

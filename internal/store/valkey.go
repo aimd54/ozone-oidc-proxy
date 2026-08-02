@@ -24,7 +24,7 @@ const valkeyPrefix = "ozpx:cred:"
 const StoreKeyBytes = 32
 
 // ParseStoreKey decodes the base64 proxy key that encrypts valkey values
-// (§6.5, §7 "secrets only in store, encrypted for valkey"). Error messages
+// (secrets live only in the store, encrypted at rest here). Error messages
 // never include the input.
 func ParseStoreKey(s string) ([]byte, error) {
 	key, err := base64.StdEncoding.DecodeString(s)
@@ -37,9 +37,9 @@ func ParseStoreKey(s string) ([]byte, error) {
 	return key, nil
 }
 
-// Valkey is the shared HA credential store (§6.5): values are AES-256-GCM
+// Valkey is the shared credential store: values are AES-256-GCM
 // encrypted with the proxy key, and valkey-go's server-assisted client-side
-// cache is the design's "small local LRU" — a Delete on any replica
+// cache is the design's "small local LRU", a Delete on any replica
 // invalidates the cached entry on every other replica.
 type Valkey struct {
 	client    valkey.Client
@@ -94,7 +94,7 @@ func NewValkey(addr string, key []byte, opts ...ValkeyOption) (*Valkey, error) {
 
 func (v *Valkey) Put(ctx context.Context, creds Credentials) error {
 	// #nosec G117 -- the marshaled record does carry the session token and
-	// secret; that is why it is sealed with AES-256-GCM below (§6.5) and
+	// secret; that is why it is sealed with AES-256-GCM below and
 	// never leaves this function in plaintext.
 	plain, err := json.Marshal(creds)
 	if err != nil {
@@ -182,7 +182,7 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 // seal encrypts plain as nonce||ciphertext. aad (the access key ID) is
 // authenticated but not encrypted: it cryptographically binds the record to
 // its store key, so an attacker with write access to valkey cannot graft one
-// record's ciphertext onto another AKID (§7, F4).
+// record's ciphertext onto another AKID.
 func seal(aead cipher.AEAD, plain, aad []byte) ([]byte, error) {
 	nonce := make([]byte, aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {

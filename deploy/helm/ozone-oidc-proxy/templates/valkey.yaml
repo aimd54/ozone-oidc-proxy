@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{- if .Values.valkey.enabled }}
-# Single-node valkey for labs and smoke tests (no persistence, no auth —
+# Single-node valkey for labs and smoke tests (no persistence, no auth,
 # protected only by the NetworkPolicy). Operate a real valkey in production
 # and point credential_store.valkey.addr at it.
 apiVersion: apps/v1

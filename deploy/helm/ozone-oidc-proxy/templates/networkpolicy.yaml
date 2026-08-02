@@ -2,16 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{- if .Values.networkPolicy.enabled }}
-# Trust boundary (DESIGN.md §7): Ozone runs unsecured behind the proxy, so
+# Trust boundary (architecture.md): Ozone runs unsecured behind the proxy, so
 # the network is the security boundary. Three policies:
-#   1. proxy ingress + egress — S3/STS reachable from anywhere the cluster
+#   1. proxy ingress + egress, S3/STS reachable from anywhere the cluster
 #      allows, admin (health/metrics/revocation) only from adminIngress
 #      (fail closed: no sources listed ⇒ port denied); egress limited to
 #      DNS, the S3 Gateway, valkey and the issuers (F3);
-#   2. s3g lockdown — the S3 Gateway accepts traffic exclusively from proxy
-#      pods (rendered only when s3gPodSelector is set — non-negotiable in
+#   2. s3g lockdown, the S3 Gateway accepts traffic exclusively from proxy
+#      pods (rendered only when s3gPodSelector is set, non-negotiable in
 #      production);
-#   3. valkey — only proxy pods may reach the credential store.
+#   3. valkey, only proxy pods may reach the credential store.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -28,7 +28,7 @@ spec:
         - port: 9000
     # Admin port (health/metrics + the state-changing revocation DELETE):
     # only the sources in networkPolicy.adminIngress. An empty list renders
-    # NO rule — the port is denied — because an empty `from:` would mean
+    # NO rule, the port is denied, because an empty `from:` would mean
     # "all sources" in the NetworkPolicy API (fail open).
     {{- if .Values.networkPolicy.adminIngress }}
     - from:
