@@ -145,7 +145,7 @@ def create_client(kc):
         "enabled": True,
         "protocol": "openid-connect",
         # Public + ROPC: a lab-only convenience; the
-        # portal and ozone-login are the human paths since M2. The device
+        # portal and ozone-login are the human paths. The device
         # grant serves ozone-login.
         "publicClient": True,
         "standardFlowEnabled": False,

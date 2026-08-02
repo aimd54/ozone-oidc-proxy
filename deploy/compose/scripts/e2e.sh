@@ -2,8 +2,8 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 #
-# End-to-end test suite for the compose stack: the M1 exit criteria of
-# architecture.md plus M2 checks, presigned URLs, the multipart matrix
+# End-to-end test suite for the compose stack: the acceptance criteria of
+# architecture.md, presigned URLs, the multipart matrix
 # (2.1.1 ListParts/ListMultipartUploads ACL enforcement,), the human
 # credential UX, the second issuer (stub IdP) and client smoke tests
 # (boto3, mc, s3a). Run from anywhere after `make up && make init`:
@@ -459,7 +459,7 @@ grep -qE "$SMOKE_MD5\s+/tmp/mc\.bin" <<<"$S3A_OUT" \
     && ok "cross-client: s3a reads mc's streamed object byte-identical" \
     || ko "cross-client: s3a reads mc's streamed object byte-identical" "$(tail -5 <<<"$S3A_OUT")"
 
-step "HA / valkey / resign / revocation (M3)"
+step "HA / valkey / resign / revocation"
 if docker ps --format '{{.Names}}' | grep -q '^oidc-proxy-b$'; then
     # Replica B (:9001 host, proxy-b:9000 in-network) shares the valkey store
     # with A and forwards in resign mode. Bash dynamic scoping: the local

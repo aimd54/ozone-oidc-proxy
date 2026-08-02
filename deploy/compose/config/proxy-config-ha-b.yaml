@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # HA overlay config for replica B (proxy-b in docker-compose.ha.yml): same
-# valkey store as replica A, but forward_mode "resign" so the M3 e2e
+# valkey store as replica A, but forward_mode "resign" so the e2e
 # exercises full re-signing toward Ozone on a live replica.
 listen: 0.0.0.0:9000
 admin_listen: 0.0.0.0:9090

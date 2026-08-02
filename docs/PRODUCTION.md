@@ -64,7 +64,7 @@ migration path: [UPSTREAM.md](UPSTREAM.md).
 - [ ] **Image supply chain.** CI builds and publishes the image; deploy by
   pinned digest. The proxy *is* the security boundary, a tampered image
   removes it silently.
-- [ ] **External security review.** The M3 review
+- [ ] **External security review.** The self-review
   ([VERIFICATION.md](VERIFICATION.md)) was a self-review; get a second
   pair of eyes before real data.
 - [ ] **Disable the Bearer lane** (`data_path.accept_bearer: false`).
