@@ -1,0 +1,20 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# markdownlint-cli2 configuration (also used by the CI job).
+# Run locally with: make lint-docs (needs Node).
+
+config:
+  # Line length: the docs use wide tables and long inline-code/URLs on
+  # purpose; wrapping them harms readability more than it helps.
+  MD013: false
+  # Table pipe alignment: files legitimately mix padded comparison tables
+  # with compact link tables; enforcing one style per file fights source
+  # readability.
+  MD060: false
+
+# Skip anything gitignored.
+gitignore: true
+
+ignores:
+  - "node_modules/**"

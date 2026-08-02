@@ -1,0 +1,8 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/aimd54/ozone-oidc-proxy/security/advisories/new
+    about: Please report security issues privately, never as public issues.

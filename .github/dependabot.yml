@@ -1,0 +1,27 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Keeps the base-image digest pins in the Dockerfiles current. Compose
+  # service images (Ozone, Keycloak, valkey, ...) are not covered; bump those
+  # by hand, since the stack is pinned to what the verification record used.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
