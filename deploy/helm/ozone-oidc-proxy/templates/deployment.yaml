@@ -1,0 +1,82 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $needsKey := eq (dig "credential_store" "type" "memory" .Values.config) "valkey" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ozone-oidc-proxy.proxySelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ozone-oidc-proxy.proxySelectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        # Explicit numeric UID: the image's USER is the name "nonroot", which
+        # runAsNonRoot alone cannot verify (CreateContainerConfigError).
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      containers:
+        - name: proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/etc/ozone-oidc-proxy/config.yaml"]
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: admin
+              containerPort: 9090
+          {{- if $needsKey }}
+          env:
+            - name: OZPX_STORE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ozone-oidc-proxy.storeKeySecret" . }}
+                  key: {{ .Values.storeKey.secretKey }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ozone-oidc-proxy
+              readOnly: true
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "ozone-oidc-proxy.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

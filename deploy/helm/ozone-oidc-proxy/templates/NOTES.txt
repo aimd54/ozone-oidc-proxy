@@ -1,0 +1,27 @@
+ozone-oidc-proxy {{ .Chart.AppVersion }} deployed.
+
+S3 + STS endpoint (in-cluster):
+  http://{{ include "ozone-oidc-proxy.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.s3Port }}
+Admin (healthz/readyz/metrics, revocation DELETE /credentials/{akid}):
+  http://{{ include "ozone-oidc-proxy.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.adminPort }}
+{{- if .Values.networkPolicy.enabled }}
+
+The admin port serves a state-changing revocation endpoint, so its
+NetworkPolicy admits only networkPolicy.adminIngress (default: pods labelled
+app.kubernetes.io/name=prometheus). If your Prometheus carries different
+labels, set networkPolicy.adminIngress to match or scraping is denied.
+{{- end }}
+
+{{- if not .Values.networkPolicy.s3gPodSelector }}
+
+WARNING: networkPolicy.s3gPodSelector is empty, so the §7 S3 Gateway
+lockdown policy was NOT rendered. With ozone.security.enabled=false anyone
+who can reach the S3 Gateway can impersonate any user — set the selector to
+your s3g pod labels (and verify your CNI enforces NetworkPolicy).
+{{- end }}
+{{- if and (eq (dig "credential_store" "type" "memory" .Values.config) "memory") (gt (int .Values.replicaCount) 1) }}
+
+WARNING: replicaCount > 1 with the in-memory credential store. Credentials
+minted on one replica are unknown to the others; switch
+config.credential_store to valkey for multi-replica deployments.
+{{- end }}

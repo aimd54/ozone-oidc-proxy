@@ -1,0 +1,45 @@
+# Ozone cluster configuration (env-var convention: OZONE-SITE.XML_key=value).
+# Single-node sizing adapted from the validated PoC stack.
+
+# Core
+CORE-SITE.XML_fs.defaultFS=ofs://om
+
+# Cluster addresses
+OZONE-SITE.XML_ozone.om.address=om
+OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.scm.http-address=scm:9876
+OZONE-SITE.XML_ozone.scm.client.address=scm
+OZONE-SITE.XML_ozone.scm.block.client.address=scm
+OZONE-SITE.XML_ozone.scm.names=scm
+
+# Storage
+OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
+OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+
+# Single-node PoC sizing
+OZONE-SITE.XML_ozone.server.default.replication=1
+OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.block.size=1MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
+OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
+OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
+OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_hdds.heartbeat.interval=5s
+OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
+OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
+OZONE-SITE.XML_hdds.scm.safemode.min.datanode=1
+OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
+
+# Trust model (DESIGN.md §9.1): no Kerberos, identity comes from the parsed
+# access key ID (injected by the proxy); OM still evaluates native ACLs.
+OZONE-SITE.XML_ozone.security.enabled=false
+OZONE-SITE.XML_ozone.acl.enabled=true
+OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
+
+# Environment
+OZONE_CONF_DIR=/etc/hadoop
+OZONE_LOG_DIR=/var/log/hadoop
+no_proxy=om,scm,s3g,datanode,keycloak,localhost,127.0.0.1

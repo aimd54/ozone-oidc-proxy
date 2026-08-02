@@ -1,0 +1,43 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# ozone-oidc-proxy configuration for the compose PoC stack (DESIGN.md §6.6).
+listen: 0.0.0.0:9000
+admin_listen: 0.0.0.0:9090
+
+upstream:
+  s3_endpoint: http://s3g:9878
+  forward_mode: rewrite
+
+data_path:
+  accept_bearer: true
+  strict: true
+
+issuers:
+  - name: keycloak
+    # Must match the token's iss claim exactly (KC_HOSTNAME pins it).
+    issuer: http://keycloak:8080/realms/ozone
+    audiences: [ozone-s3] # requires the audience mapper created by init
+    username_claim: preferred_username
+  - name: stub
+    # Second issuer (M2, §11.4): static stub standing in for a proprietary
+    # IdP. Deliberately different audience and username claim to prove the
+    # per-issuer registry live. Test-only — see deploy/compose/stub-issuer/.
+    issuer: http://stub-issuer:8081
+    audiences: [ozone-data]
+    username_claim: uid
+
+sts:
+  max_duration: 3600
+  role_arn_allowlist: ["arn:ozone:iam::dev:role/oidc"]
+
+credential_store:
+  type: memory
+
+security:
+  sigv4_clock_skew: 15m
+  allowed_signing_algs: [RS256, ES256]
+  region: us-east-1
+
+username_policy:
+  pattern: "^[A-Za-z0-9._@-]{1,64}$"

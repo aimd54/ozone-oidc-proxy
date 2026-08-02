@@ -1,0 +1,48 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Credential-portal overlay (DESIGN.md §11.4): oauth2-proxy + portal on top
+# of the base stack. Usage:
+#
+#   make portal-up      # docker compose -f docker-compose.yml -f docker-compose.portal.yml ...
+#
+# Browser flows redirect to http://keycloak:8080 (pinned issuer): add
+# `127.0.0.1 keycloak` to /etc/hosts on the machine running the browser.
+services:
+  credential-portal:
+    image: ozone-oidc-proxy:dev
+    container_name: oidc-credential-portal
+    # Same image as the proxy; run the second binary it ships.
+    entrypoint: ["/usr/local/bin/credential-portal"]
+    command: []
+    environment:
+      PORTAL_LISTEN: :8090
+      PORTAL_STS_ENDPOINT: http://proxy:9000
+      PORTAL_ROLE_ARN: arn:ozone:iam::dev:role/oidc
+      PORTAL_PUBLIC_ENDPOINT: http://localhost:9000
+    depends_on:
+      proxy:
+        condition: service_started
+    networks:
+      - oidc-net
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    container_name: oidc-oauth2-proxy
+    command: ["--config=/etc/oauth2-proxy/config.cfg"]
+    ports:
+      - "4180:4180" # the human entry point
+    volumes:
+      - ./config/oauth2-proxy.cfg:/etc/oauth2-proxy/config.cfg:ro
+    environment:
+      OAUTH2_PROXY_CLIENT_ID: ozone-portal
+      # PoC-only fixed secrets; init.py provisions the matching client.
+      OAUTH2_PROXY_CLIENT_SECRET: portal-secret-123
+      OAUTH2_PROXY_COOKIE_SECRET: "0123456789abcdef0123456789abcdef"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      credential-portal:
+        condition: service_started
+    networks:
+      - oidc-net

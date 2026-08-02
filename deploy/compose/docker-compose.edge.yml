@@ -1,0 +1,38 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# TLS edge overlay: HAProxy in front of the proxy, modeling the production
+# ingress (the operator runs HAProxy with real certificates in production).
+# Run `deploy/compose/edge/gen-cert.sh` first (make edge-up does both).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.edge.yml up -d
+#
+# Clients: https://localhost:8443 from the host, https://haproxy:8443 on the
+# compose network — self-signed, so pass the CA (edge/certs/edge.crt) or
+# disable verification in lab tooling.
+name: ozone-oidc-proxy
+
+services:
+  haproxy:
+    image: haproxy:lts-alpine
+    container_name: oidc-haproxy
+    hostname: haproxy
+    volumes:
+      - ./edge/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./edge/certs:/usr/local/etc/haproxy/certs:ro
+    ports:
+      - "8443:8443"
+    depends_on:
+      - proxy
+    healthcheck:
+      # Healthy = TLS handshake succeeds AND the strict proxy answers the
+      # anonymous probe with 403 (the PRODUCTION.md boundary check): proves
+      # edge TLS, routing to the backend, and that strict mode is alive.
+      # 127.0.0.1, not localhost: the container resolves localhost to ::1
+      # first and the frontend binds IPv4.
+      test: ["CMD-SHELL", "wget --no-check-certificate -O /dev/null https://127.0.0.1:8443/ 2>&1 | grep -q 403"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - oidc-net

@@ -1,0 +1,196 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# PoC stack for ozone-oidc-proxy (DESIGN.md §11.3, milestone M1):
+# Keycloak (OIDC IdP) + stock Apache Ozone 2.1.1 + the proxy.
+#
+# Trust boundary (§7): the S3 Gateway publishes NO host port — the proxy is
+# the only way in. Keycloak's KC_HOSTNAME is pinned so tokens always carry
+# iss=http://keycloak:8080/realms/ozone no matter where the token request
+# came from (host or container).
+name: ozone-oidc-proxy
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: oidc-keycloak
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin123
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
+    ports:
+      - "8080:8080" # token endpoint (ROPC in the PoC); UI needs a host alias for "keycloak"
+    healthcheck:
+      # Health endpoints live on the management port (9000) in Keycloak 26.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - oidc-net
+
+  ozone-scm:
+    image: apache/ozone:2.1.1
+    container_name: oidc-ozone-scm
+    hostname: scm
+    volumes:
+      - scm-data:/data
+    env_file:
+      - ./config/docker-config
+    environment:
+      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE_OPTS:
+    command: ["ozone", "scm"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9876/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - oidc-net
+
+  ozone-om:
+    image: apache/ozone:2.1.1
+    container_name: oidc-ozone-om
+    hostname: om
+    volumes:
+      - om-data:/data
+      - ./scripts:/scripts:ro
+    env_file:
+      - ./config/docker-config
+    environment:
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS:
+    command: ["ozone", "om"]
+    depends_on:
+      ozone-scm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9874/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - oidc-net
+
+  ozone-datanode:
+    image: apache/ozone:2.1.1
+    container_name: oidc-ozone-datanode
+    hostname: datanode
+    volumes:
+      - datanode-data:/data
+    env_file:
+      - ./config/docker-config
+    environment:
+      OZONE_OPTS:
+    command: ["ozone", "datanode"]
+    depends_on:
+      ozone-scm:
+        condition: service_healthy
+      ozone-om:
+        condition: service_healthy
+    networks:
+      - oidc-net
+
+  # Stock image, unsecured mode, ACLs evaluated by OM. Internal only: no ports.
+  ozone-s3g:
+    image: apache/ozone:2.1.1
+    container_name: oidc-ozone-s3g
+    hostname: s3g
+    env_file:
+      - ./config/docker-config
+    environment:
+      OZONE_OPTS:
+    command: ["ozone", "s3g"]
+    depends_on:
+      ozone-om:
+        condition: service_healthy
+      ozone-datanode:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9878/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks:
+      - oidc-net
+
+  # Second OIDC issuer (M2, DESIGN.md §11.4): a static stub standing in for a
+  # proprietary IdP — discovery + JWKS + an UNAUTHENTICATED /token mint.
+  # Test-only, internal-only: no published port; anyone who can reach /token
+  # can mint arbitrary identities for the "stub" issuer.
+  stub-issuer:
+    build:
+      context: ./stub-issuer
+    image: ozone-oidc-stub-issuer:dev
+    container_name: oidc-stub-issuer
+    environment:
+      STUB_ISSUER: http://stub-issuer:8081
+      STUB_AUDIENCE: ozone-data
+    networks:
+      - oidc-net
+
+  proxy:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: ozone-oidc-proxy:dev
+    container_name: oidc-proxy
+    volumes:
+      - ./config/proxy-config.yaml:/etc/ozone-oidc-proxy/config.yaml:ro
+    ports:
+      - "9000:9000" # S3 + STS (the only public data endpoint)
+      # Admin: /healthz /readyz /metrics AND the state-changing revocation
+      # DELETE — localhost only (never LAN-exposed). Prometheus scrapes
+      # proxy:9090 over the compose network, so this bind does not affect it.
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      ozone-s3g:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - oidc-net
+
+  # One-shot provisioning: Keycloak realm, client (+ audience mapper), users.
+  init-service:
+    build:
+      context: ./init
+    container_name: oidc-init
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_HEALTH_URL: http://keycloak:9000
+      KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      REALM: ozone
+      CLIENT_ID: ozone-s3
+      AUDIENCE: ozone-s3
+      ACCESS_TOKEN_LIFESPAN: "3600"
+      PORTAL_CLIENT_ID: ozone-portal
+      PORTAL_CLIENT_SECRET: portal-secret-123 # PoC only; overlay uses the same
+      PORTAL_REDIRECT_URI: http://localhost:4180/oauth2/callback
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - init
+    networks:
+      - oidc-net
+
+networks:
+  oidc-net:
+    driver: bridge
+
+volumes:
+  scm-data:
+  om-data:
+  datanode-data:

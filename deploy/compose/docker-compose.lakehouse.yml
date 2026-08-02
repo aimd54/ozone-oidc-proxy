@@ -1,0 +1,144 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Lakehouse overlay (modeled on the user's lakehouse-for-fun stack):
+# Nessie (Iceberg REST catalog) + Postgres (version store) + a light Jupyter
+# with PyIceberg — everything talking S3 through the OIDC proxy.
+#
+# The point: Nessie carries NO static S3 secret. A sidecar keeps a Keycloak
+# client-credentials JWT fresh in a shared volume, and the AWS SDK's default
+# credentials chain (auth-type=APPLICATION_GLOBAL) auto-exchanges it at the
+# proxy STS (AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE +
+# AWS_ENDPOINT_URL_STS) — the same §6.9 flow the boto3 smoke test proves.
+#
+#   make lakehouse-up     (needs: make up && make init first)
+name: ozone-oidc-proxy
+
+services:
+  postgres:
+    image: postgres:18.1
+    container_name: oidc-postgres
+    hostname: postgres
+    shm_size: 128mb
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: catalog
+      POSTGRES_INITDB_ARGS: "--encoding UTF8 --data-checksums"
+    healthcheck:
+      test: "pg_isready -U postgres"
+      interval: 5s
+      timeout: 2s
+      retries: 15
+    networks:
+      - oidc-net
+
+  # Keeps /tokens/nessie.jwt fresh: client-credentials grant for the
+  # `nessie` Keycloak client (provisioned by make init). The AWS SDK re-reads
+  # the file whenever it needs to re-exchange, so a 10-minute refresh loop
+  # against a 1-hour token lifespan never leaves Nessie with a stale JWT.
+  nessie-token-refresher:
+    image: curlimages/curl:latest
+    container_name: oidc-nessie-token-refresher
+    user: "0:0" # the shared named volume is root-owned
+    volumes:
+      - nessie-tokens:/tokens
+    command:
+      - sh
+      - -ec
+      - |
+        while true; do
+          if RESP=$$(curl -sf \
+              -d grant_type=client_credentials \
+              -d client_id=nessie -d client_secret=nessie-secret-123 \
+              http://keycloak:8080/realms/ozone/protocol/openid-connect/token); then
+            TOKEN=$$(printf '%s' "$$RESP" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+            if [ -n "$$TOKEN" ]; then
+              printf '%s' "$$TOKEN" > /tokens/.nessie.jwt.tmp
+              mv /tokens/.nessie.jwt.tmp /tokens/nessie.jwt
+              echo "web-identity token refreshed"
+            fi
+          else
+            echo "token refresh failed; retrying in 10s"
+            sleep 10
+            continue
+          fi
+          sleep 600
+        done
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - oidc-net
+
+  nessie:
+    image: ghcr.io/projectnessie/nessie:0.106.1
+    container_name: oidc-nessie
+    hostname: nessie
+    ports:
+      - "19120:19120" # API + UI
+    volumes:
+      - nessie-tokens:/tokens:ro
+    environment:
+      # Version store: Postgres.
+      - nessie.version.store.type=JDBC
+      - nessie.version.store.persist.jdbc.datasource=postgresql
+      - quarkus.datasource.postgresql.jdbc.url=jdbc:postgresql://postgres:5432/catalog
+      - quarkus.datasource.postgresql.username=postgres
+      - quarkus.datasource.postgresql.password=postgres
+      # Iceberg warehouse on Ozone, through the OIDC proxy.
+      - nessie.catalog.default-warehouse=warehouse
+      - nessie.catalog.warehouses.warehouse.location=s3://lakehouse/
+      - nessie.catalog.service.s3.default-options.region=us-east-1
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+      - nessie.catalog.service.s3.default-options.endpoint=http://proxy:9000/
+      # No static keys: AWS SDK default credentials chain → web identity.
+      - nessie.catalog.service.s3.default-options.auth-type=APPLICATION_GLOBAL
+      - AWS_REGION=us-east-1
+      - AWS_ROLE_ARN=arn:ozone:iam::dev:role/oidc
+      - AWS_ROLE_SESSION_NAME=nessie
+      - AWS_WEB_IDENTITY_TOKEN_FILE=/tokens/nessie.jwt
+      - AWS_ENDPOINT_URL_STS=http://proxy:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nessie-token-refresher:
+        condition: service_started
+      proxy:
+        condition: service_started
+    healthcheck:
+      test: "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /q/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"
+      interval: 5s
+      timeout: 2s
+      retries: 30
+    networks:
+      - oidc-net
+
+  jupyter:
+    build:
+      context: ./lakehouse/jupyter
+    image: ozone-oidc-jupyter:dev
+    container_name: oidc-jupyter
+    hostname: jupyter
+    ports:
+      - "8890:8888"
+    volumes:
+      - ./lakehouse/notebooks:/home/lakehouse/notebooks
+    depends_on:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8888/api')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - oidc-net
+
+networks:
+  oidc-net:
+
+volumes:
+  postgres-data:
+  nessie-tokens:

@@ -1,0 +1,100 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+replicaCount: 2
+
+image:
+  repository: ozone-oidc-proxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  s3Port: 9000
+  adminPort: 9090
+
+# Rendered verbatim as the proxy's config.yaml (see repository README for the
+# full reference). Multi-replica deployments need credential_store.type
+# "valkey" — with "memory" every replica has its own store and SigV4
+# verification fails on whichever replica did not mint the credentials.
+config:
+  listen: 0.0.0.0:9000
+  admin_listen: 0.0.0.0:9090
+  upstream:
+    s3_endpoint: http://ozone-s3g:9878
+    forward_mode: rewrite # or "resign"
+  data_path:
+    accept_bearer: true
+    strict: true
+  issuers:
+    - name: keycloak
+      issuer: https://keycloak.example.com/realms/ozone
+      audiences: [ozone-s3]
+      username_claim: preferred_username
+  sts:
+    max_duration: 3600
+    role_arn_allowlist: []
+  credential_store:
+    type: memory
+    # type: valkey
+    # valkey:
+    #   addr: RELEASE-NAME-ozone-oidc-proxy-valkey:6379
+
+# AES-256 key for valkey value encryption, surfaced as $OZPX_STORE_KEY.
+# Required when credential_store.type is "valkey".
+storeKey:
+  # Name of an existing Secret carrying the key under storeKey.secretKey.
+  existingSecret: ""
+  secretKey: OZPX_STORE_KEY
+  # Convenience for labs only: create the Secret from this literal value
+  # (base64 of 32 random bytes). Use existingSecret in production.
+  create: false
+  value: ""
+
+# Single-node in-chart valkey for labs and smoke tests. Production should
+# point credential_store.valkey.addr at a properly operated valkey.
+valkey:
+  enabled: false
+  image: valkey/valkey:8
+
+networkPolicy:
+  # Emits (1) an ingress+egress policy for the proxy (S3/STS from anywhere,
+  # the admin port only from adminIngress below; egress limited to DNS, the
+  # S3 Gateway, valkey and the issuers — F3), (2) the §7 lockdown for the S3
+  # Gateway — ingress exclusively from proxy pods — and (3) a valkey
+  # policy when the in-chart valkey is enabled.
+  enabled: true
+  # Sources allowed to reach the admin port (:9090) — health, metrics AND the
+  # state-changing revocation DELETE. This is NOT the whole namespace: it
+  # renders verbatim as the `from:` peers of the admin ingress rule. Point it
+  # at your Prometheus's pod labels. FAIL CLOSED: an empty list renders no
+  # admin rule at all, so the port is denied until you list sources here
+  # (an empty `from:` would mean "all sources" in the NetworkPolicy API).
+  # kube-apiserver port-forward and node/kubelet probes are not subject to
+  # this rule.
+  adminIngress:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+  # Pod labels of the Ozone S3 Gateway (same namespace). The s3g lockdown
+  # policy is only rendered when this selector is non-empty, and the F3
+  # egress rule toward the gateway is scoped to these pods (unscoped on
+  # s3gPort when empty).
+  s3gPodSelector: {}
+  #  app: ozone
+  #  component: s3g
+  s3gPort: 9878
+  # F3 egress toward the issuers (OIDC discovery + JWKS). Default: any peer
+  # on issuerEgressPorts — tighten to your IdP's ipBlock/namespace where the
+  # network allows it, e.g.
+  #   issuerEgress:
+  #     - ipBlock: { cidr: 10.20.30.0/24 }
+  issuerEgress:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+  issuerEgressPorts: [443]
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

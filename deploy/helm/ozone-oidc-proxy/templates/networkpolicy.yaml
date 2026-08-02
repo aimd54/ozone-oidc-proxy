@@ -1,0 +1,119 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.networkPolicy.enabled }}
+# Trust boundary (DESIGN.md §7): Ozone runs unsecured behind the proxy, so
+# the network is the security boundary. Three policies:
+#   1. proxy ingress + egress — S3/STS reachable from anywhere the cluster
+#      allows, admin (health/metrics/revocation) only from adminIngress
+#      (fail closed: no sources listed ⇒ port denied); egress limited to
+#      DNS, the S3 Gateway, valkey and the issuers (F3);
+#   2. s3g lockdown — the S3 Gateway accepts traffic exclusively from proxy
+#      pods (rendered only when s3gPodSelector is set — non-negotiable in
+#      production);
+#   3. valkey — only proxy pods may reach the credential store.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}-ingress
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ozone-oidc-proxy.proxySelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - port: 9000
+    # Admin port (health/metrics + the state-changing revocation DELETE):
+    # only the sources in networkPolicy.adminIngress. An empty list renders
+    # NO rule — the port is denied — because an empty `from:` would mean
+    # "all sources" in the NetworkPolicy API (fail open).
+    {{- if .Values.networkPolicy.adminIngress }}
+    - from:
+        {{- toYaml .Values.networkPolicy.adminIngress | nindent 8 }}
+      ports:
+        - port: 9090
+    {{- end }}
+  # Egress (F3): the proxy initiates connections only toward DNS, the S3
+  # Gateway, valkey and the issuers' JWKS endpoints. Anything else (a
+  # compromised proxy exfiltrating, an SSRF pivot) is dropped by the CNI.
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    {{- if .Values.networkPolicy.s3gPodSelector }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.s3gPodSelector | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.s3gPort }}
+    {{- else }}
+    - ports:
+        - port: {{ .Values.networkPolicy.s3gPort }}
+    {{- end }}
+    {{- if .Values.valkey.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "ozone-oidc-proxy.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: valkey
+      ports:
+        - port: 6379
+    {{- end }}
+    # Issuers (JWKS/discovery). Default is any peer on 443; tighten
+    # issuerEgress to your IdP's addresses where the network allows it.
+    - to:
+        {{- toYaml .Values.networkPolicy.issuerEgress | nindent 8 }}
+      ports:
+        {{- range .Values.networkPolicy.issuerEgressPorts }}
+        - port: {{ . }}
+        {{- end }}
+{{- if .Values.networkPolicy.s3gPodSelector }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}-s3g-lockdown
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml .Values.networkPolicy.s3gPodSelector | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "ozone-oidc-proxy.proxySelectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.networkPolicy.s3gPort }}
+{{- end }}
+{{- if .Values.valkey.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}-valkey
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ozone-oidc-proxy.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: valkey
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "ozone-oidc-proxy.proxySelectorLabels" . | nindent 14 }}
+      ports:
+        - port: 6379
+{{- end }}
+{{- end }}

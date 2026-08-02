@@ -1,0 +1,44 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# HA overlay config for replica A (docker-compose.ha.yml): identical to the
+# base proxy-config.yaml except the credential store moves to valkey (§6.5)
+# so both replicas share minted credentials. Forward mode stays "rewrite".
+listen: 0.0.0.0:9000
+admin_listen: 0.0.0.0:9090
+
+upstream:
+  s3_endpoint: http://s3g:9878
+  forward_mode: rewrite
+
+data_path:
+  accept_bearer: true
+  strict: true
+
+issuers:
+  - name: keycloak
+    issuer: http://keycloak:8080/realms/ozone
+    audiences: [ozone-s3]
+    username_claim: preferred_username
+  - name: stub
+    issuer: http://stub-issuer:8081
+    audiences: [ozone-data]
+    username_claim: uid
+
+sts:
+  max_duration: 3600
+  role_arn_allowlist: ["arn:ozone:iam::dev:role/oidc"]
+
+credential_store:
+  type: valkey
+  valkey:
+    addr: valkey:6379
+    # AES-256 key comes from $OZPX_STORE_KEY (set in the overlay), never here.
+
+security:
+  sigv4_clock_skew: 15m
+  allowed_signing_algs: [RS256, ES256]
+  region: us-east-1
+
+username_policy:
+  pattern: "^[A-Za-z0-9._@-]{1,64}$"

@@ -1,0 +1,53 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.valkey.enabled }}
+# Single-node valkey for labs and smoke tests (no persistence, no auth —
+# protected only by the NetworkPolicy). Operate a real valkey in production
+# and point credential_store.valkey.addr at it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}-valkey
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ozone-oidc-proxy.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: valkey
+  template:
+    metadata:
+      labels:
+        {{- include "ozone-oidc-proxy.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: valkey
+    spec:
+      containers:
+        - name: valkey
+          image: {{ .Values.valkey.image }}
+          ports:
+            - name: valkey
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ozone-oidc-proxy.fullname" . }}-valkey
+  labels:
+    {{- include "ozone-oidc-proxy.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  selector:
+    {{- include "ozone-oidc-proxy.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
+{{- end }}

@@ -1,0 +1,45 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Monitoring overlay (M3, DESIGN.md §8/§11.5): Prometheus scrapes the proxy's
+# :9090 /metrics; Grafana auto-provisions the datasource and the committed
+# dashboard (deploy/dashboards/ozone-oidc-proxy.json). Usage:
+#
+#   make monitor-up     # docker compose -f docker-compose.yml -f docker-compose.monitor.yml ...
+#
+# Grafana: http://localhost:3000 (anonymous viewer, no login). Combine with
+# the HA overlay to watch both replicas: make ha-up && make monitor-up.
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: oidc-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    # Internal only by default; expose for ad-hoc PromQL if you want it.
+    expose:
+      - "9090"
+    networks:
+      - oidc-net
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: oidc-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Lab-only: anonymous read access, no login, no sign-up. Do not reuse
+      # this posture outside the PoC.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - oidc-net
