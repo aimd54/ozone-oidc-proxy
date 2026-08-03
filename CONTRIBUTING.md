@@ -97,10 +97,12 @@ What that means in practice:
 - Errors that cross package boundaries are wrapped sentinel errors
   (`oidc.ErrTokenExpired`, `sigv4.ErrSignatureMismatch`, ...) matched with
   `errors.Is`, so the HTTP layer can map them to the right S3 error code.
-- Design decisions live in [docs/architecture.md](docs/architecture.md), which the code
-  cross-references by section (...). A significant design change
-  updates that document in the same pull request, keeping the section
-  references accurate.
+- Design decisions live in [docs/architecture.md](docs/architecture.md), which
+  the code cross-references by heading rather than by section number, so a
+  reference survives an edit to the document. A significant design change
+  updates that document in the same pull request; a decision that reverses an
+  earlier one gets a new record in [docs/adr/](docs/adr/) instead of an edit to
+  the old one.
 
 ## Filing issues and pull requests
 

@@ -28,7 +28,7 @@ help:
 	@echo "  make check         - All local gates (run before every commit)"
 	@echo "  make docker-build  - Build the proxy container image ($(IMAGE))"
 	@echo ""
-	@echo "Compose stack (deploy/compose): Keycloak + Ozone 2.1.1 + proxy"
+	@echo "Compose stack (deploy/compose): Keycloak + Ozone + proxy"
 	@echo "  make up            - Build the image and start the stack"
 	@echo "  make init          - Provision Keycloak realm/users and Ozone volume ACLs"
 	@echo "  make e2e           - Run the end-to-end test suite"
