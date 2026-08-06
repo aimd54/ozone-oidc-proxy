@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: help build test vet fmt-check lint tidy-check lint-docs check docker-build up init e2e loadtest portal-up portal-down ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
+.PHONY: help build test vet fmt-check lint tidy-check lint-docs check docker-build up init demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
 
 BINARY  = bin/ozone-oidc-proxy
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -29,11 +29,13 @@ help:
 	@echo "  make docker-build  - Build the proxy container image ($(IMAGE))"
 	@echo ""
 	@echo "Compose stack (deploy/compose): Keycloak + Ozone + proxy"
+	@echo "  make demo          - up + init + a real S3 round-trip (start here)"
 	@echo "  make up            - Build the image and start the stack"
 	@echo "  make init          - Provision Keycloak realm/users and Ozone volume ACLs"
 	@echo "  make e2e           - Run the end-to-end test suite"
 	@echo "  make portal-up     - Add the credential portal + oauth2-proxy overlay"
 	@echo "  make portal-down   - Remove the portal overlay services"
+	@echo "  make check-hosts   - Check this machine resolves 'keycloak' (browser sign-in)"
 	@echo "  make ha-up         - Add the HA overlay: valkey store + second replica (resign)"
 	@echo "  make ha-down       - Remove the HA overlay, restore the single-replica proxy"
 	@echo "  make monitor-up    - Add the monitoring overlay: Prometheus + Grafana (localhost:3000)"
@@ -47,7 +49,7 @@ help:
 	@echo "  make down          - Stop the stack (keep volumes)"
 	@echo "  make clean         - Stop the stack and delete volumes"
 	@echo ""
-	@echo "Quickstart: make up && make init && make e2e"
+	@echo "Quickstart: make demo"
 
 GO_BUILD = CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
@@ -89,7 +91,11 @@ init:
 	$(COMPOSE) run --rm --build init-service
 	$(COMPOSE) exec ozone-om bash /scripts/setup-volume-acls.sh
 	@echo ""
-	@echo "Initialization done. Next: make e2e"
+	@echo "Initialization done. Next: make demo"
+
+# Shortest path from a clean checkout to a working S3 call.
+demo: up init
+	./deploy/compose/scripts/demo.sh
 
 e2e:
 	./deploy/compose/scripts/e2e.sh
@@ -100,8 +106,18 @@ loadtest:
 portal-up: docker-build
 	$(COMPOSE_PORTAL) up -d --wait credential-portal oauth2-proxy || ($(COMPOSE_PORTAL) ps; exit 1)
 	@echo ""
-	@echo "Portal: http://localhost:4180, the browser must resolve 'keycloak'"
-	@echo "(add '127.0.0.1 keycloak' to /etc/hosts)."
+	@echo "Portal: http://localhost:4180"
+	@echo ""
+	@# Advisory here rather than fatal: the overlay is genuinely up, and the
+	@# acceptance suite reaches the issuer with curl --resolve, so it does not
+	@# need the hosts entry. Only a human with a browser does.
+	@./deploy/compose/scripts/check-hosts.sh || true
+
+# Does this machine resolve the pinned issuer hostname? Browser sign-in and
+# ozone-login need it; the acceptance suite and the demo do not. Exits
+# non-zero when the entry is missing, so it can gate a script.
+check-hosts:
+	@./deploy/compose/scripts/check-hosts.sh
 
 portal-down:
 	$(COMPOSE_PORTAL) rm -sf oauth2-proxy credential-portal

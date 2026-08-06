@@ -45,6 +45,7 @@ containerized by the suite, so it is not needed on the host.
 ```sh
 make build      # bin/: ozone-oidc-proxy, ozone-login, credential-portal
 make check      # gofmt, go vet, golangci-lint, tidy check, race-enabled unit tests
+make demo       # up + init + one real S3 round-trip, the fastest sanity check
 make up         # start the compose stack (Keycloak + Ozone + proxy)
 make init       # provision the Keycloak realm/users and the /s3v volume ACLs
 make e2e        # end-to-end suite against that stack
