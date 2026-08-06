@@ -11,7 +11,6 @@
 *.out
 /vendor/
 
-
 # IDE / editors
 .idea/
 .vscode/
@@ -23,12 +22,13 @@
 
 # OS
 .DS_Store
+
+# Lab TLS material, generated on demand by deploy/compose/edge/gen-cert.sh
 deploy/compose/edge/certs/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Local working notes, never published.
+# Local assistant and agent configuration
+.claude/
 CLAUDE.md
-
-dist/
