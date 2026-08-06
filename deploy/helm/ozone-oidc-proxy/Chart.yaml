@@ -4,11 +4,11 @@
 apiVersion: v2
 name: ozone-oidc-proxy
 description: >-
-  OIDC authentication proxy for the Apache Ozone S3 Gateway: AWS-compatible
-  STS token exchange, SigV4 verification against minted temporary
-  credentials, Bearer JWT data path, strict mode. See architecture.md in the
-  repository for the architecture; for the trust boundary the bundled
-  NetworkPolicies implement.
+  Use Apache Ozone from standard S3 clients with OIDC single sign-on:
+  AWS-compatible STS token exchange, SigV4 verification against minted
+  temporary credentials, a Bearer JWT data path, and strict mode. Ozone's own
+  ACLs still decide who may do what. See architecture.md in the repository for
+  the design and for the trust boundary the bundled NetworkPolicies implement.
 type: application
 version: 0.1.0
-appVersion: "0.3.0"
+appVersion: "0.1.0"

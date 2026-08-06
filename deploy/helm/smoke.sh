@@ -28,6 +28,9 @@ kind load docker-image ozone-oidc-proxy:dev valkey/valkey:8 --name "$CLUSTER"
 
 echo "== helm install (valkey store, 2 replicas)"
 STORE_KEY=$(head -c 32 /dev/urandom | base64 -w0)
+# The chart ships an unresolvable placeholder issuer on purpose, so a real
+# one has to be supplied here. Nothing in this smoke test exchanges a token;
+# the value only has to be a well-formed issuer the config validator accepts.
 if ! helm install "$RELEASE" "$CHART" \
     --set replicaCount=2 \
     --set valkey.enabled=true \
@@ -36,6 +39,10 @@ if ! helm install "$RELEASE" "$CHART" \
     --set config.credential_store.type=valkey \
     --set "config.credential_store.valkey.addr=$RELEASE-ozone-oidc-proxy-valkey:6379" \
     --set "networkPolicy.s3gPodSelector.app=ozone-s3g" \
+    --set "config.issuers[0].name=corp-idp" \
+    --set "config.issuers[0].issuer=https://idp.example.com" \
+    --set "config.issuers[0].audiences[0]=ozone-s3" \
+    --set "config.issuers[0].username_claim=preferred_username" \
     --wait --timeout 180s; then
     echo "== install failed; diagnostics:"
     kubectl get pods -o wide

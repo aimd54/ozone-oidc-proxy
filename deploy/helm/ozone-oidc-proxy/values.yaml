@@ -3,6 +3,9 @@
 
 replicaCount: 2
 
+# Defaults to the locally built image, which is what deploy/helm/smoke.sh
+# side-loads into kind. For a real cluster point this at a published tag, as
+# values-example.yaml does.
 image:
   repository: ozone-oidc-proxy
   tag: dev
@@ -17,6 +20,11 @@ service:
 # full reference). Multi-replica deployments need credential_store.type
 # "valkey", with "memory" every replica has its own store and SigV4
 # verification fails on whichever replica did not mint the credentials.
+#
+# TWO KEYS HAVE NO USABLE DEFAULT and must be set for any real deployment:
+# config.issuers (your OIDC provider) and config.upstream.s3_endpoint (your
+# S3 Gateway). issuers is a list of maps rendered verbatim, so `--set` cannot
+# express it: copy values-example.yaml and install with `-f`.
 config:
   listen: 0.0.0.0:9000
   admin_listen: 0.0.0.0:9090
@@ -26,11 +34,12 @@ config:
   data_path:
     accept_bearer: true
     strict: true
-  issuers:
-    - name: keycloak
-      issuer: https://keycloak.example.com/realms/ozone
-      audiences: [ozone-s3]
-      username_claim: preferred_username
+  # No default on purpose. A plausible-looking placeholder would pass config
+  # validation, start cleanly, report readiness, and then reject every token
+  # at runtime with "unknown issuer". Empty instead fails closed: the proxy
+  # refuses to start with "at least one issuer must be configured".
+  # See values-example.yaml.
+  issuers: []
   sts:
     max_duration: 3600
     role_arn_allowlist: []
@@ -60,7 +69,7 @@ valkey:
 networkPolicy:
   # Emits (1) an ingress+egress policy for the proxy (S3/STS from anywhere,
   # the admin port only from adminIngress below; egress limited to DNS, the
-  # S3 Gateway, valkey and the issuers, F3), (2) the lockdown for the S3
+  # S3 Gateway, valkey and the issuers), (2) the lockdown for the S3
   # Gateway, ingress exclusively from proxy pods, and (3) a valkey
   # policy when the in-chart valkey is enabled.
   enabled: true
@@ -77,14 +86,14 @@ networkPolicy:
         matchLabels:
           app.kubernetes.io/name: prometheus
   # Pod labels of the Ozone S3 Gateway (same namespace). The s3g lockdown
-  # policy is only rendered when this selector is non-empty, and the F3
+  # policy is only rendered when this selector is non-empty, and the proxy's
   # egress rule toward the gateway is scoped to these pods (unscoped on
   # s3gPort when empty).
   s3gPodSelector: {}
   #  app: ozone
   #  component: s3g
   s3gPort: 9878
-  # F3 egress toward the issuers (OIDC discovery + JWKS). Default: any peer
+  # Egress toward the issuers (OIDC discovery + JWKS). Default: any peer
   # on issuerEgressPorts, tighten to your IdP's ipBlock/namespace where the
   # network allows it, e.g.
   #   issuerEgress:

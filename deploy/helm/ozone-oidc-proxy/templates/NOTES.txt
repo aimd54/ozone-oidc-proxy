@@ -25,3 +25,11 @@ WARNING: replicaCount > 1 with the in-memory credential store. Credentials
 minted on one replica are unknown to the others; switch
 config.credential_store to valkey for multi-replica deployments.
 {{- end }}
+{{- if not .Values.config.issuers }}
+
+WARNING: config.issuers is empty, so the proxy will refuse to start with
+"at least one issuer must be configured". This is deliberate: there is no
+safe default identity provider. Copy values-example.yaml, set the issuer URL,
+audiences and username claim your provider actually emits, and install with
+-f. `--set` cannot express config.issuers, it is a list of maps.
+{{- end }}

@@ -7,7 +7,7 @@
 #   1. proxy ingress + egress, S3/STS reachable from anywhere the cluster
 #      allows, admin (health/metrics/revocation) only from adminIngress
 #      (fail closed: no sources listed ⇒ port denied); egress limited to
-#      DNS, the S3 Gateway, valkey and the issuers (F3);
+#      DNS, the S3 Gateway, valkey and the issuers;
 #   2. s3g lockdown, the S3 Gateway accepts traffic exclusively from proxy
 #      pods (rendered only when s3gPodSelector is set, non-negotiable in
 #      production);
@@ -36,7 +36,7 @@ spec:
       ports:
         - port: 9090
     {{- end }}
-  # Egress (F3): the proxy initiates connections only toward DNS, the S3
+  # Egress: the proxy initiates connections only toward DNS, the S3
   # Gateway, valkey and the issuers' JWKS endpoints. Anything else (a
   # compromised proxy exfiltrating, an SSRF pivot) is dropped by the CNI.
   egress:

@@ -1,0 +1,97 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A worked example for running the proxy against your own Ozone cluster and
+# your own OIDC provider. Copy it, edit the marked values, and install with:
+#
+#   helm install ozpx deploy/helm/ozone-oidc-proxy -f my-values.yaml
+#
+# `--set` cannot express config.issuers: it is a list of maps rendered
+# verbatim into the ConfigMap, so a values file is the only way to set it.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/aimd54/ozone-oidc-proxy
+  tag: v0.1.0
+  pullPolicy: IfNotPresent
+
+config:
+  upstream:
+    # EDIT: your S3 Gateway Service. It must not be reachable by anything
+    # other than these proxy pods (see networkPolicy.s3gPodSelector below).
+    s3_endpoint: http://ozone-s3g:9878
+
+  # EDIT: your identity provider. `issuer` must equal the `iss` claim your
+  # tokens actually carry, byte for byte, and `audiences` must match an `aud`
+  # your provider emits. Empty audiences are rejected at startup by design.
+  # jwks_uri is optional: without it the proxy uses OIDC discovery at
+  # <issuer>/.well-known/openid-configuration.
+  issuers:
+    - name: corp-idp
+      issuer: https://idp.example.com
+      audiences: [ozone-s3]
+      username_claim: preferred_username
+    # A second provider, with its own audience and username claim, is just
+    # another entry:
+    # - name: partner-idp
+    #   issuer: https://token.partner.example
+    #   jwks_uri: https://token.partner.example/keys
+    #   audiences: [s3]
+    #   username_claim: sub
+
+  data_path:
+    # SigV4 with short-lived minted credentials is the primary path. Turning
+    # the Bearer lane off keeps long-lived JWTs off every request.
+    accept_bearer: false
+    strict: true
+
+  sts:
+    max_duration: 3600
+    # Empty accepts any RoleArn. Pin it if your clients use a fixed one.
+    role_arn_allowlist: []
+
+  # Required for more than one replica: with "memory" each replica has its
+  # own store, and SigV4 verification fails on whichever replica did not mint
+  # the credentials.
+  credential_store:
+    type: valkey
+    valkey:
+      addr: ozpx-ozone-oidc-proxy-valkey:6379
+
+# The AES-256 key for valkey value encryption, surfaced as $OZPX_STORE_KEY.
+# EDIT: create this Secret out of band (Vault, external-secrets,
+# sealed-secrets) and name it here. Never put the key in a values file.
+storeKey:
+  existingSecret: ozpx-store-key
+  secretKey: OZPX_STORE_KEY
+  create: false
+
+# The in-chart valkey is a single node with no auth or TLS, for labs and
+# smoke tests. Point credential_store.valkey.addr at a properly operated
+# valkey instead, and leave this disabled.
+valkey:
+  enabled: false
+
+networkPolicy:
+  enabled: true
+  # EDIT: the pod labels of your Ozone S3 Gateway, in this namespace. The
+  # lockdown policy is not rendered at all while this is empty, and with
+  # ozone.security.enabled=false anyone who can reach the gateway directly
+  # can act as any user.
+  s3gPodSelector:
+    app: ozone
+    component: s3g
+  s3gPort: 9878
+  # EDIT: the pod labels of whatever scrapes /metrics. This also gates the
+  # state-changing revocation endpoint, so keep it narrow. An empty list
+  # renders no rule at all, denying the port.
+  adminIngress:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+  # EDIT where your network allows it: narrow egress to your provider rather
+  # than leaving it open to any peer on issuerEgressPorts.
+  issuerEgress:
+    - ipBlock:
+        cidr: 0.0.0.0/0
