@@ -13,8 +13,8 @@ const minimalYAML = `
 upstream:
   s3_endpoint: http://ozone-s3g:9878
 issuers:
-  - name: keycloak
-    issuer: https://keycloak.local/realms/ozone
+  - name: corp-idp
+    issuer: https://idp.example.com
     audiences: [ozone-s3]
 `
 
@@ -67,8 +67,8 @@ data_path:
   strict: true
 
 issuers:
-  - name: keycloak
-    issuer: https://keycloak.local/realms/ozone
+  - name: corp-idp
+    issuer: https://idp.example.com
     audiences: [ozone-s3]
     username_claim: preferred_username
   - name: corp-dev

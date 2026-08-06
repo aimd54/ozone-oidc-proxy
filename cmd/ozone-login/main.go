@@ -6,7 +6,7 @@
 // AWS_WEB_IDENTITY_TOKEN_FILE at the file it maintains and every AWS
 // SDK/CLI exchanges it against the proxy's STS endpoint automatically.
 //
-//	ozone-login -issuer http://keycloak:8080/realms/ozone
+//	ozone-login -issuer https://idp.example.com
 //
 // The refresh loop runs until interrupted; -once writes the first token and
 // exits (cron-style usage).
@@ -31,7 +31,7 @@ var version = "dev"
 
 func main() {
 	issuer := flag.String("issuer", os.Getenv("OZONE_ISSUER"),
-		"OIDC issuer URL (env OZONE_ISSUER), e.g. http://keycloak:8080/realms/ozone")
+		"OIDC issuer URL (env OZONE_ISSUER), e.g. https://idp.example.com")
 	clientID := flag.String("client-id", envOr("OZONE_CLIENT_ID", "ozone-s3"),
 		"OIDC client ID with the device grant enabled (env OZONE_CLIENT_ID)")
 	tokenFile := flag.String("token-file", defaultTokenFile(),

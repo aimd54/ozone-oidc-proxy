@@ -34,7 +34,7 @@ var (
 
 // Client drives the device flow against one issuer.
 type Client struct {
-	Issuer   string // e.g. http://keycloak:8080/realms/ozone
+	Issuer   string // e.g. https://idp.example.com
 	ClientID string
 	Scope    string // "openid" is enough for the proxy's STS
 

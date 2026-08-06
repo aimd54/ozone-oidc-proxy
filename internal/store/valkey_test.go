@@ -120,8 +120,8 @@ func TestValkeyLiveRoundTrip(t *testing.T) {
 		}
 	}
 
-	// F4: the record is AAD-bound to its AKID, grafting the raw ciphertext
-	// onto another key must fail decryption, not impersonate.
+	// The record is AAD-bound to its AKID: grafting the raw ciphertext onto
+	// another key must fail decryption, not impersonate.
 	grafted := "OZPXGRAFTEDRECORD000"
 	if err := v.client.Do(ctx, v.client.B().Set().Key(valkeyPrefix+grafted).
 		Value(string(raw)).Build()).Error(); err != nil {

@@ -4,7 +4,7 @@
 #
 # End-to-end test suite for the compose stack: the acceptance criteria of
 # architecture.md, presigned URLs, the multipart matrix
-# (2.1.1 ListParts/ListMultipartUploads ACL enforcement,), the human
+# (2.1.1 ListParts/ListMultipartUploads ACL enforcement), the human
 # credential UX, the second issuer (stub IdP) and client smoke tests
 # (boto3, mc, s3a). Run from anywhere after `make up && make init`:
 #
@@ -140,7 +140,7 @@ OWNER=$($COMPOSE exec -T ozone-om ozone sh bucket info "/s3v/$BUCKET" 2>/dev/nul
 if [ "$OWNER" = "alice" ]; then
     ok "bucket owner attributed to OIDC user (owner=alice): synthetic header accepted by stock 2.1.1"
 else
-    ko "bucket owner attributed to OIDC user" "owner='$OWNER' (day-0 check#1 failed)"
+    ko "bucket owner attributed to OIDC user" "owner='$OWNER', expected 'alice'"
 fi
 
 echo "hello from the oidc proxy" | aws_as "$A_AKID" "$A_SECRET" "$A_SESSION" s3 cp - "s3://$BUCKET/hello.txt" >/dev/null 2>&1 \

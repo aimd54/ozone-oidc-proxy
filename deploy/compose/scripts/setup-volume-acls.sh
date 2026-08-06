@@ -9,8 +9,8 @@
 #   r (read) + l (list)   , required for any S3 traversal
 #   w (write) + c (create): bucket creation through the S3 API: OM checks
 #                            WRITE on the volume for CreateBucket (verified
-#                            against 2.1.1 via om-audit;)
-# Per-bucket grants stay per-user/per-bucket (see the e2e script and).
+#                            against 2.1.1 via om-audit)
+# Per-bucket grants stay per-user/per-bucket (see the e2e script).
 set -e
 
 if [ ! -x /opt/hadoop/bin/ozone ] && ! command -v ozone >/dev/null; then
