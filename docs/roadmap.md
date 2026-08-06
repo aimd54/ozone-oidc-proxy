@@ -33,8 +33,10 @@ been built.
 
 Recorded with dates, image digests, and the commands used in
 [VERIFICATION.md](VERIFICATION.md), including the findings that changed the
-implementation. Clients are smoke-tested with boto3, mc, and s3a, and a
-lakehouse walkthrough exercises table writes over these credentials.
+implementation. boto3, mc and s3a are each exercised against a running
+cluster, including an 8 MiB streaming upload read back byte-identical by a
+different client, and a lakehouse walkthrough exercises table writes over
+these credentials.
 
 Verification tracks the current Ozone release. The exact build under test is in
 that record rather than in prose that would go stale.

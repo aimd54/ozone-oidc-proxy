@@ -21,10 +21,10 @@ migration path: [UPSTREAM.md](UPSTREAM.md).
   trust chain: plain HTTP or lax cert validation lets an on-path attacker
   substitute signing keys and mint identities. The compose stack's
   `http://keycloak:8080` is lab-only.
-- [x] **F3, egress NetworkPolicy.** The proxy may talk only to the
+- [x] **Egress NetworkPolicy.** The proxy may talk only to the
   issuers, the S3 Gateway, valkey and DNS (chart:
   `networkPolicy.issuerEgress` / `issuerEgressPorts`).
-- [x] **F4, store records bound to their key.** Valkey values are
+- [x] **Store records bound to their key.** Valkey values are
   AES-256-GCM sealed with the access key ID as AAD: a store-level attacker
   cannot graft one record's ciphertext onto another AKID.
 - [x] **Admin port fails closed.** `networkPolicy.adminIngress: []` now
@@ -109,8 +109,8 @@ What does change is identity plumbing, plan for these:
 - **Semantics shift**: Ranger is deny-by-default with central policies,
   the native model's implicit owner rights and `ozone sh addacl` workflow
   no longer apply.
-- **Unverified here.** This repo has never run Ranger; treat it as a
-  future compose overlay + verification milestone before relying on it.
+- **Unverified here.** This repo has never run Ranger; stand up a compose
+  overlay and verify it against a running cluster before relying on it.
 
 ## When upstream ships
 

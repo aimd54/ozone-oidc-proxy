@@ -87,21 +87,28 @@ included) for free ([client compatibility](#client-compatibility-and-credential-
 
 ```txt
                         ┌──────────────────────────────────────────┐
-                        │             ozone-oidc-proxy              │
- (1) JWT ──────────────▶│ STS handler            JWKS validator ───┼──▶ Keycloak
- (2) temp creds ◀───────│ (AssumeRoleWith        (multi-issuer,    │──▶ any OIDC IdP
-                        │  WebIdentity)           cached)          │
-                        │        │                    ▲            │
-                        │        ▼                    │            │
-                        │  Credential store    Bearer validator    │
-                        │  (memory | valkey)          ▲            │
-                        │        ▲                    │            │
- (3a) SigV4 S3 ────────▶│  SigV4 verifier ──┐         │            │
- (3b) Bearer S3 ───────▶│───────────────────┴─▶ Synthetic-header ──┼──▶ Ozone S3G :9878
-                        │                       injector           │    (stock Ozone,
-                        └──────────────────────────────────────────┘     internal only)
-        Browser ──▶ oauth2-proxy ──(Bearer)──▶ proxy (3b)   [satellite, [the oauth2-proxy satellite](#oauth2-proxy-an-official-satellite)]
+                        │             ozone-oidc-proxy             │
+                        │                                          │
+ (1) JWT ──────────────▶│  STS handler            JWKS validator ──┼──▶ any OIDC provider
+ (2) temp creds ◀───────│  (AssumeRoleWith        (multi-issuer,   │
+                        │   WebIdentity)           cached)         │
+                        │         │                    ▲           │
+                        │         ▼                    │           │
+                        │  Credential store            │           │
+                        │  (memory | valkey)           │           │
+                        │         ▲                    │           │
+ (3a) SigV4 S3 ────────▶│  SigV4 verifier              │           │
+ (3b) Bearer S3 ───────▶│  Bearer validator ───────────┘           │
+                        │         │                                │
+                        │         ▼                                │
+                        │  Synthetic-header injector ──────────────┼──▶ Ozone S3G :9878
+                        └──────────────────────────────────────────┘    stock and unmodified,
+                                                                        reachable only here
 ```
+
+Browsers reach the Bearer lane through oauth2-proxy, which exchanges a
+session cookie for `Authorization: Bearer <jwt>`. See
+"oauth2-proxy: an official satellite".
 
 The proxy is an independent process beside a **stock, unmodified** Ozone
 deployment: it owns its release cycle, its blast radius is one process, and its
@@ -130,31 +137,48 @@ anything that can reach the proxy could then assert any identity.
 Token exchange:
 
 ```txt
-Client            STS handler                Issuer
-  │ POST Action=AssumeRoleWithWebIdentity      │
-  │ WebIdentityToken=<JWT>, RoleArn, ...         │
-  ├─────────────▶│ iss allowlist → JWKS verify │
-  │              │──(cached JWKS)─────────────▶│
-  │              │ aud, exp/nbf, alg allowlist │
-  │              │ username_claim → sanitize   │
-  │              │ mint {AKID, secret, token}  │
-  │              │ TTL=min(jwt.exp−now, req, max)
-  │ ◀── XML Credentials{AKID, Secret, SessionToken, Expiration}
+Client                     STS handler                     Issuer
+  │                            │                             │
+  │  POST Action=AssumeRoleWithWebIdentity                   │
+  │  WebIdentityToken=<JWT>, RoleArn                         │
+  ├───────────────────────────▶│                             │
+  │                            │  issuer allowlist           │
+  │                            ├──── JWKS, cached ──────────▶│
+  │                            │◀──── signing keys ──────────┤
+  │                            │  verify signature           │
+  │                            │  aud, exp, nbf, alg         │
+  │                            │  username_claim, sanitize   │
+  │                            │  mint AKID, secret, token   │
+  │                            │  TTL = min(jwt.exp - now,   │
+  │                            │            requested, max)  │
+  │◀── XML Credentials ────────┤                             │
+  │    AKID, Secret, SessionToken, Expiration                │
 ```
 
 Data path:
 
 ```txt
-Client                 Proxy                             Ozone S3G
-  │ 3a SigV4(temp creds)  │ AKID lookup → miss/expired → 403│
-  │  + security token     │ session-token match             │
-  ├──────────────────────▶│ recompute SigV4, const-time cmp │
-  │ 3b Bearer <jwt>       │ validate JWT (issuer registry)  │
-  ├──────────────────────▶│                                 │
-  │        both:          │ inject synthetic header         │
-  │                       │  Credential=<username>/...        ├──▶ parse header,
-  │                       │                                 │    user=<username>,
-  │  ◀── streamed response┤                                 │    OM native ACL check
+Client                      Proxy                      Ozone S3G
+  │                           │                            │
+  │  3a SigV4(temp creds)     │                            │
+  │      + session token      │                            │
+  ├──────────────────────────▶│  AKID lookup               │
+  │                           │  miss or expired, then 403 │
+  │                           │  session token compare     │
+  │                           │  recompute SigV4,          │
+  │                           │  constant-time compare     │
+  │                           │                            │
+  │  3b Bearer <jwt>          │                            │
+  ├──────────────────────────▶│  validate JWT against the  │
+  │                           │  issuer registry           │
+  │                           │                            │
+  │  either lane:             │  inject synthetic header   │
+  │                           │  Credential=<username>/... │
+  │                           ├───────────────────────────▶│
+  │                           │                            │  parse header,
+  │                           │                            │  user=<username>,
+  │                           │                            │  OM native ACL check
+  │◀──── streamed response ───┤◀───────────────────────────┤
 ```
 
 ## Detailed design
@@ -298,13 +322,13 @@ data_path:
   strict: true                 # no fallback; unauthenticated → 403
 
 issuers:
-  - name: keycloak
-    issuer: https://keycloak.local/realms/ozone
+  - name: corp-idp
+    issuer: https://idp.example.com
     audiences: [ozone-s3]
     username_claim: preferred_username
-  - name: corp-dev
-    issuer: https://token.corp.example
-    jwks_uri: https://token.corp.example/keys
+  - name: partner-idp
+    issuer: https://token.partner.example
+    jwks_uri: https://token.partner.example/keys
     audiences: [s3]
     username_claim: sub
 
@@ -344,13 +368,16 @@ Runtime dependencies are deliberately few: jwx, yaml, prometheus, valkey-go.
 
 ```txt
 /cmd/proxy/                  # the proxy itself
-/cmd/ozone-login/            # device-flow token helper for humans ([client compatibility](#client-compatibility-and-credential-lifecycle))
+/cmd/ozone-login/            # device-flow token helper for humans
 /cmd/credential-portal/      # browser credential page behind oauth2-proxy
 /internal/{config,oidc,sts,sigv4,store,forward,server,s3err,devicelogin}/
 /deploy/compose/             # runnable stack: Ozone + Keycloak + proxy
 /deploy/helm/                # Kubernetes chart + NetworkPolicies
 /docs/
 ```
+
+What `ozone-login` maintains, and how each client consumes it, is under
+"Client compatibility and credential lifecycle".
 
 ### Client compatibility and credential lifecycle
 

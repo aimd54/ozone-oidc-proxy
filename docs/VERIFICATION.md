@@ -3,8 +3,7 @@
 What follows is the evidence trail for every claim this project makes:
 each entry was executed against the runnable compose stack in
 `deploy/compose/`, on stock Apache Ozone, and records what was checked, what
-passed, and what was found along the way. Milestones and section numbers
-refer to [architecture.md](architecture.md).
+passed, and what was found along the way.
 
 The first entries date from **2026-07-06**.
 
@@ -51,8 +50,8 @@ Evidence, in increasing strength:
    bucket (`AccessDenied`), can list after
    `ozone sh bucket addacl -a user:bob:rl`.
 
-The other day-0 item, upstream STS status, is design-time research,
-recorded in and tracked in [UPSTREAM.md](UPSTREAM.md).
+Upstream STS status is design-time research rather than a live check, and is
+tracked in [UPSTREAM.md](UPSTREAM.md).
 
 ## Finding: CreateBucket requires WRITE on the volume
 
@@ -191,7 +190,7 @@ monitoring overlay, and the load test's p99 gate.
 ### HA / valkey / resign / revocation
 
 Both replicas share a valkey store (`OZPX_STORE_KEY` AES-256-GCM value
-encryption,); replica A forwards in `rewrite` mode, replica B in `resign`.
+encryption); replica A forwards in `rewrite` mode, replica B in `resign`.
 The e2e "HA / valkey / resign / revocation" step (skips when the overlay is
 down) proves, end-to-end:
 
@@ -212,7 +211,7 @@ down) proves, end-to-end:
 Suite total with the HA overlay up: **78 passed, 0 failed**
 (`make up && make init && make ha-up && make e2e`).
 
-### Load test, verification overhead ( exit criterion)
+### Load test, verification overhead
 
 `make loadtest` mints a credential, signs GETs with the proxy's own
 `sigv4.Sign`, and reads the p99 back from the `verification_duration_seconds`
@@ -220,10 +219,14 @@ histogram (bucket-delta over the run, no PromQL). The pure verification step
 (measured immediately after the compare, before logging/rewrite) meets the
 < 1 ms p99 target with wide margin:
 
-- dedicated run (idle host): **20 000 requests, 7 254 req/s, 0 errors, p99 ≤
-  0.25 ms**;
-- during this session (monitoring overlay co-resident): **5 000 requests,
-  1 813 req/s, 0 errors, p99 ≤ 0.5 ms**.
+- with the stack otherwise idle: **20 000 requests, 7 254 req/s, 0 errors,
+  p99 ≤ 0.25 ms**;
+- with the monitoring overlay co-resident: **5 000 requests, 1 813 req/s,
+  0 errors, p99 ≤ 0.5 ms**.
+
+Both runs are single-node compose stacks on a developer machine, so the
+throughput figures describe the load generator as much as the proxy. The p99
+is the number the gate asserts.
 
 ### Helm chart + NetworkPolicies, kind smoke
 
@@ -331,7 +334,9 @@ Operational findings baked into the overlay:
 smoke script passes 4/4 (Nessie API v2, Iceberg REST facade, token file,
 Jupyter).
 
-The day-0 unknown resolved **yes**: Nessie's AWS SDK (Java v2) honors
+The open question going in was whether a Java workload could reach Ozone
+through the proxy with no static secret at all. It resolved **yes**:
+Nessie's AWS SDK (Java v2) honors
 `AWS_ENDPOINT_URL_STS` inside its web-identity credentials provider, so
 `auth-type=APPLICATION_GLOBAL` + the refresher sidecar give Nessie S3
 access with **no static secret anywhere**: the proxy log shows the whole
@@ -340,7 +345,7 @@ chain:
 ```txt
 "msg":"token exchange succeeded","handler":"sts",
   "username":"service-account-nessie","issuer":"keycloak",
-  "access_key_id":"OZPXP0CQ1HJ6K9R9N5ED","role_session_name":"nessie"
+  "access_key_id":"OZPXEXAMPLE234567890","role_session_name":"nessie"
 "msg":"sigv4 verified","lane":"sigv4","method":"HEAD","path":"/lakehouse",
   "username":"service-account-nessie","issuer":"keycloak"
 ```
@@ -361,9 +366,35 @@ rightly 403'd the v2 URLs, which the notebooks' first headless runs
 surfaced (a silent print, not an exception, worth remembering when
 reading notebook "green" runs).
 
+## Chart default fails closed (2026-08-06, same stack)
+
+The chart used to default to a plausible-looking issuer URL. Feeding the
+rendered ConfigMap to the proxy's own `config.Parse` showed why that was the
+wrong shape of default: it returned no error, so a release installed without
+an override would start, report readiness, and reject every token at runtime
+as an unknown issuer. Readiness cannot catch it, because it never contacts the
+identity provider.
+
+An empty issuer list is rejected instead, with `at least one issuer must be
+configured`, so the proxy refuses to start. Both directions are checked
+against the rendered manifests: the chart default is rejected, and the
+configuration the kind smoke test installs still parses. `helm install
+--dry-run` prints the accompanying warning for the default and stays silent
+for a configured release.
+
+`make demo` was added as the shortest path from a clean checkout to a working
+S3 call, and asserts the property that matters rather than the absence of an
+error: after the round-trip, `ozone sh bucket info` must report the OIDC user
+as the bucket owner. Verified live, and verified to fail when it should
+(unreachable issuer, tampered JWT rejected with `InvalidIdentityToken`, and
+the owner check reads empty rather than passing when the bucket is missing).
+
+Base suite on the same tree: **69 passed, 0 failed**.
+
 ## Reproduce
 
 ```bash
+make demo                            # up + init + one real S3 round-trip
 make up && make init && make e2e     # base suite (69/69)
 make edge-up && make e2e             # + TLS edge via HAProxy (73/73)
 make lakehouse-up && make lakehouse-smoke   # Nessie/Iceberg overlay (4/4)
