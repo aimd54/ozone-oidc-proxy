@@ -12,6 +12,7 @@ on:
   schedule:
     - cron: '30 2 * * 1' # weekly, Monday 02:30 UTC
   branch_protection_rule:
+  workflow_dispatch:
 
 # Default to no permissions; the job requests exactly what it needs.
 permissions: {}

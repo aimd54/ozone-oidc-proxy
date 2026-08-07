@@ -13,6 +13,7 @@ on:
     branches: [main]
   schedule:
     - cron: '15 3 * * 1' # weekly, Monday 03:15 UTC
+  workflow_dispatch:
 
 # Default to no permissions; the job requests exactly what it needs.
 permissions: {}

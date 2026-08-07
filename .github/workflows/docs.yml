@@ -22,6 +22,7 @@ on:
       - "docs/**"
       - ".markdownlint-cli2.yaml"
       - ".github/workflows/docs.yml"
+  workflow_dispatch:
 
 # Default to no permissions; the job requests exactly what it needs.
 permissions: {}

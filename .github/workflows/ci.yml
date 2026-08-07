@@ -22,6 +22,9 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+  # Re-runnable by hand. A path filter or an outage can leave a commit with no
+  # run against it, and a release should never be cut from an unverified one.
+  workflow_dispatch:
 
 # Default to no permissions; each job requests exactly what it needs.
 permissions: {}
