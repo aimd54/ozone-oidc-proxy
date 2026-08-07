@@ -33,3 +33,4 @@ deploy/compose/edge/certs/
 .claude/
 CLAUDE.md
 docs/superpowers/
+.superpowers/
