@@ -1,7 +1,7 @@
 # Roadmap
 
-What works, what has been checked against a running cluster, and what has not
-been built.
+What works, what has been checked against a running cluster, what is planned
+next, and what has deliberately not been built.
 
 ## Working
 
@@ -28,6 +28,9 @@ been built.
   effect across replicas.
 - **Deployment.** A Helm chart with network policies, a compose stack for
   local work, and a Prometheus and Grafana overlay.
+- **Signed releases.** Binaries for linux and darwin on amd64 and arm64, each
+  archive carrying an SBOM, with the checksums signed keylessly and build
+  provenance attested. A distroless container image is published alongside.
 
 ## Verified against a running cluster
 
@@ -40,6 +43,43 @@ these credentials.
 
 Verification tracks the current Ozone release. The exact build under test is in
 that record rather than in prose that would go stale.
+
+## Planned
+
+Ordered by what stands between this and a defensible production deployment.
+Each is intended work rather than a decision against it, which is what
+separates this list from the one below.
+
+- **Rate limiting on the STS lane.** The token exchange is the only surface
+  that accepts an unauthenticated request, since the JWT is parsed before
+  anything is trusted, and no shipped configuration throttles it. The
+  production checklist lists it as a requirement and defers it to the edge,
+  but the TLS edge overlay does not implement it either, so the box cannot
+  currently be ticked with anything this repository provides. Where it belongs
+  is an open question: the proxy would cover every deployment shape, including
+  the chart, which ships no edge, but it would have to decide whether to trust
+  a forwarded client address, and that is a security decision in its own
+  right. The 1 MiB body cap is not a rate limit.
+- **Alert rules, and a probe that fails loudly.** The metrics and the Grafana
+  dashboard exist; nothing acts on them. Two checks matter more than the rest,
+  because both fail silently open if a policy is edited carelessly: an
+  anonymous request to the proxy must be refused, and the S3 Gateway must not
+  be reachable from outside the sanctioned path. Verification-failure spikes,
+  store errors, issuer unreachability and upstream error rates are worth
+  alerting on once the rules file exists.
+- **Unit coverage on the identity-injection path.** `RewriteAccessKeyID` in
+  `internal/forward` decides which username Ozone attributes every
+  primary-data-path request to, and strips the session token from both the
+  header and the signed-headers list. It has no unit test, while its two
+  siblings do. `internal/s3err` renders every data-path rejection and has no
+  test file at all, though correct S3 error codes are what make SDK retry
+  behaviour work. Both are exercised by the acceptance suite, but this
+  project's own rule is that anything on the authentication path carries a
+  negative case.
+- **An operations runbook.** Credential revocation, identity-provider signing
+  key rotation, and the response to a leaked credential. All three are
+  implemented and verified; none is written down as a procedure someone could
+  follow under pressure.
 
 ## Not built
 
