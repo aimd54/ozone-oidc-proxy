@@ -52,6 +52,7 @@ archives:
   - formats: [tar.gz]
     files:
       - LICENSE
+      - NOTICE
       - README.md
 
 checksum:
@@ -83,6 +84,9 @@ dockers_v2:
   - id: proxy
     ids: [proxy, credential-portal]
     dockerfile: Dockerfile.release
+    extra_files:
+      - LICENSE
+      - NOTICE
     images:
       - ghcr.io/aimd54/ozone-oidc-proxy
     tags:
