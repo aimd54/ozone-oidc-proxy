@@ -29,6 +29,7 @@ deploy/compose/edge/certs/
 # Jupyter
 .ipynb_checkpoints/
 
-# Local assistant and agent configuration
+# Local assistant and agent configuration, and the working notes it produces
 .claude/
 CLAUDE.md
+docs/superpowers/
