@@ -7,8 +7,14 @@
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 
-COPY ozone-oidc-proxy /usr/local/bin/ozone-oidc-proxy
-COPY credential-portal /usr/local/bin/credential-portal
+# goreleaser builds this image with buildx for several platforms at once, and
+# stages each platform's binaries under <os>/<arch>/ in the build context
+# rather than at its root. TARGETOS and TARGETARCH are supplied by buildx, so
+# one Dockerfile serves every platform.
+ARG TARGETOS
+ARG TARGETARCH
+COPY ${TARGETOS}/${TARGETARCH}/ozone-oidc-proxy /usr/local/bin/ozone-oidc-proxy
+COPY ${TARGETOS}/${TARGETARCH}/credential-portal /usr/local/bin/credential-portal
 
 # Attribution for the Apache-2.0 components linked into these binaries,
 # required by section 4(d) of that license.
