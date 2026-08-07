@@ -76,8 +76,7 @@ with the credential-lifecycle caveats per client, is in
 
 > **Scope.** This is an Apache Ozone-specific tool rather than a generic S3
 > gateway. It relies on how Ozone attributes requests in unsecured mode, which
-> is not how other S3 implementations behave ([why](#why-ozone-only)). Not
-> affiliated with or endorsed by the Apache Software Foundation.
+> is not how other S3 implementations behave ([why](#why-ozone-only)).
 
 ```txt
                        ┌────────────────────────────────────┐
@@ -592,6 +591,12 @@ Other S3 implementations do not behave that way:
 
 Ozone is the case where the gap is both real and closable, so the design
 targets it specifically.
+
+## Trademarks
+
+Apache, Apache Ozone and Ozone are trademarks of the Apache Software
+Foundation. This project is independent, and is not affiliated with or
+endorsed by the Apache Software Foundation.
 
 ## License
 

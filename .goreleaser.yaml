@@ -99,6 +99,7 @@ dockers_v2:
       org.opencontainers.image.source: https://github.com/aimd54/ozone-oidc-proxy
       org.opencontainers.image.licenses: Apache-2.0
       org.opencontainers.image.description: OIDC authentication for the Apache Ozone S3 Gateway
+      org.opencontainers.image.vendor: The ozone-oidc-proxy Authors. Apache, Apache Ozone and Ozone are trademarks of the Apache Software Foundation; this project is not affiliated with or endorsed by it.
 
 changelog:
   use: git
