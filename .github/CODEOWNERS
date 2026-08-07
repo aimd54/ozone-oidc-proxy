@@ -1,0 +1,28 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Review is requested automatically from the owners listed here. Paths later
+# in the file win, so the security-sensitive areas below override the catch-all.
+
+* @aimd54
+
+# The authentication path. A defect here is a bypass rather than a bug, so
+# these directories carry the invariants recorded in docs/adr/: wire-form
+# signature verification, constant-time comparison, mandatory audience checks,
+# and no unauthenticated fallback.
+/internal/oidc/    @aimd54
+/internal/sigv4/   @aimd54
+/internal/sts/     @aimd54
+/internal/forward/ @aimd54
+/internal/server/  @aimd54
+/internal/store/   @aimd54
+
+# The release pipeline signs and attests what users install.
+/.github/workflows/ @aimd54
+/.goreleaser.yaml   @aimd54
+/Dockerfile         @aimd54
+/Dockerfile.release @aimd54
+
+# The network is the trust boundary in this design, so the chart's policies
+# are as security-relevant as the code.
+/deploy/helm/ @aimd54
