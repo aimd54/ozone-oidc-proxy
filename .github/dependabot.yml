@@ -17,6 +17,15 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # init, autobuild and analyze share one pinned commit and have to agree
+      # on it: a change that moves one of them alone leaves the job failing
+      # with a configuration error, so the update is only mergeable as a set.
+      # upload-sarif belongs here too, though it runs in its own workflow and
+      # would pass on its own.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # Keeps the base-image digest pins in the Dockerfiles current. Compose
   # service images (Ozone, Keycloak, valkey, ...) are not covered; bump those
