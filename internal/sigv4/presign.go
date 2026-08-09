@@ -48,6 +48,18 @@ func IsPresigned(r *http.Request) bool {
 	return hasAlg || hasSig
 }
 
+// IsSigV2Query reports whether the request carries SigV2 query authentication,
+// the form an aws CLI emits for a presigned URL when it has not been pinned to
+// SigV4. Both markers are required: an access key id on its own is an ordinary
+// query parameter, and the pair is what distinguishes a signed URL from one.
+// This proxy verifies SigV4 only, and saying so beats a generic rejection.
+func IsSigV2Query(r *http.Request) bool {
+	q := r.URL.Query()
+	_, hasAKID := q["AWSAccessKeyId"]
+	_, hasSig := q["Signature"]
+	return hasAKID && hasSig
+}
+
 // ParsePresigned extracts and validates the auth query parameters.
 func ParsePresigned(r *http.Request) (*Presigned, error) {
 	q := r.URL.Query()

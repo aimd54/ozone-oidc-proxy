@@ -21,6 +21,7 @@ const (
 	CodeRequestTimeTooSkewed              = "RequestTimeTooSkewed"
 	CodeAuthorizationHeaderMalformed      = "AuthorizationHeaderMalformed"
 	CodeAuthorizationQueryParametersError = "AuthorizationQueryParametersError"
+	CodeInvalidRequest                    = "InvalidRequest"
 	CodeMissingSecurityHeader             = "MissingSecurityHeader"
 	CodeInternalError                     = "InternalError"
 	CodeServiceUnavailable                = "ServiceUnavailable"

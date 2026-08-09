@@ -295,3 +295,26 @@ func TestIsPresigned(t *testing.T) {
 		}
 	}
 }
+
+func TestIsSigV2Query(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"sigv2 presigned", "AWSAccessKeyId=OZPXZM3G51B76HXK23R9&Signature=qtCZ4EX6sL4YigzKZpibBF6sIHA%3D&Expires=1786143563", true},
+		{"sigv2 with session token", "AWSAccessKeyId=OZPXZM3G51B76HXK23R9&Signature=abc%3D&x-amz-security-token=tok&Expires=1786143563", true},
+		{"sigv4 presigned", "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=deadbeef&X-Amz-Expires=3600", false},
+		{"no query at all", "", false},
+		{"akid without signature", "AWSAccessKeyId=OZPXZM3G51B76HXK23R9", false},
+		{"signature without akid", "Signature=abc%3D&Expires=1786143563", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/bucket/key?"+tc.query, nil)
+			if got := IsSigV2Query(r); got != tc.want {
+				t.Errorf("IsSigV2Query(%q) = %v, want %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}

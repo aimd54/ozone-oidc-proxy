@@ -538,6 +538,28 @@ func TestStrictModeBlocksEverythingElse(t *testing.T) {
 	}
 }
 
+func TestSigV2QueryAuthGetsSigV4Guidance(t *testing.T) {
+	env := newEnv(t, strictCfg, defaultValidate)
+	url := env.proxy.URL + "/bucket/key?AWSAccessKeyId=OZPXZM3G51B76HXK23R9" +
+		"&Signature=qtCZ4EX6sL4YigzKZpibBF6sIHA%3D&Expires=1786143563"
+
+	resp := mustDo(t, mustReq(t, http.MethodGet, url))
+	body := bodyOf(t, resp)
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status %d, want 400", resp.StatusCode)
+	}
+	if !strings.Contains(body, "<Code>InvalidRequest</Code>") {
+		t.Errorf("body %s, want code InvalidRequest", body)
+	}
+	if !strings.Contains(body, "Please use AWS4-HMAC-SHA256.") {
+		t.Errorf("body %s, want the AWS4-HMAC-SHA256 guidance", body)
+	}
+	if env.upstream.last != nil {
+		t.Error("a sigv2 query request reached upstream")
+	}
+}
+
 func TestNonStrictForwardsUntouched(t *testing.T) {
 	cfg := `
 upstream: {s3_endpoint: %s}

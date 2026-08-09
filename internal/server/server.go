@@ -391,6 +391,13 @@ func (s *Server) serveUnauthenticated(w http.ResponseWriter, r *http.Request, re
 	log := s.logger.With("request_id", reqID, "lane", "none", "method", r.Method, "path", r.URL.Path)
 
 	if s.cfg.DataPath.StrictEnabled() {
+		if sigv4.IsSigV2Query(r) {
+			log.Info("sigv2 query authentication rejected")
+			s3err.Write(w, http.StatusBadRequest, s3err.CodeInvalidRequest,
+				"The authorization mechanism you have provided is not supported. "+
+					"Please use AWS4-HMAC-SHA256.", r.URL.Path, reqID)
+			return
+		}
 		log.Info("unauthenticated request rejected (strict mode)")
 		s3err.Write(w, http.StatusForbidden, s3err.CodeAccessDenied,
 			"authentication required: present a Bearer token or temporary SigV4 credentials", r.URL.Path, reqID)
