@@ -3,7 +3,7 @@
 #
 # Monitoring overlay (architecture.md): Prometheus scrapes the proxy's
 # :9090 /metrics; Grafana auto-provisions the datasource and the committed
-# dashboard (deploy/dashboards/ozone-oidc-proxy.json). Usage:
+# dashboard (dashboards/ozone-oidc-proxy.json). Usage:
 #
 #   make monitor-up     # docker compose -f docker-compose.yml -f docker-compose.monitor.yml ...
 #
@@ -38,7 +38,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../dashboards:/var/lib/grafana/dashboards:ro
+      - ../../dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks:

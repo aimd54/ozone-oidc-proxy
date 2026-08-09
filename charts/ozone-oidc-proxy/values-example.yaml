@@ -4,7 +4,7 @@
 # A worked example for running the proxy against your own Ozone cluster and
 # your own OIDC provider. Copy it, edit the marked values, and install with:
 #
-#   helm install ozpx deploy/helm/ozone-oidc-proxy -f my-values.yaml
+#   helm install ozpx charts/ozone-oidc-proxy -f my-values.yaml
 #
 # `--set` cannot express config.issuers: it is a list of maps rendered
 # verbatim into the ConfigMap, so a values file is the only way to set it.

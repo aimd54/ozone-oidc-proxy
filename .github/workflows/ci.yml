@@ -112,11 +112,11 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
       - name: Lint and render the chart
         run: |
-          helm lint deploy/helm/ozone-oidc-proxy
+          helm lint charts/ozone-oidc-proxy
           # Both shapes: without the S3 Gateway selector (no lockdown policy)
           # and with it (the production shape).
-          helm template smoke deploy/helm/ozone-oidc-proxy > /dev/null
-          helm template smoke deploy/helm/ozone-oidc-proxy \
+          helm template smoke charts/ozone-oidc-proxy > /dev/null
+          helm template smoke charts/ozone-oidc-proxy \
             --set networkPolicy.s3gPodSelector.app=ozone-s3g > /dev/null
 
   build:

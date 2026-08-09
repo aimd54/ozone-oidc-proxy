@@ -2,7 +2,7 @@
 
 What follows is the evidence trail for every claim this project makes:
 each entry was executed against the runnable compose stack in
-`deploy/compose/`, on stock Apache Ozone, and records what was checked, what
+`examples/compose/`, on stock Apache Ozone, and records what was checked, what
 passed, and what was found along the way.
 
 The first entries date from **2026-07-06**.
@@ -63,7 +63,7 @@ buckets.
 ## Acceptance suite, first full pass
 
 `make up && make init && make e2e` → **27 passed, 0 failed**
-(`deploy/compose/scripts/e2e.sh`):
+(`examples/compose/scripts/e2e.sh`):
 
 - **Token acquisition**: ROPC JWTs for alice/bob; `aud=ozone-s3` present
   (audience mapper).
@@ -139,7 +139,7 @@ Browser flows resolve the pinned issuer host via `/etc/hosts`
 ## A second issuer (2026-07-07, same stack)
 
 Multi-issuer is verified live. A static stub issuer
-(`deploy/compose/stub-issuer/`: discovery + JWKS + an unauthenticated,
+(`examples/compose/stub-issuer/`: discovery + JWKS + an unauthenticated,
 test-only `/token` mint, internal-only, no host port) is registered as a
 second issuer with a deliberately different audience (`ozone-data`) and
 username claim (`uid`):
@@ -230,7 +230,7 @@ is the number the gate asserts.
 
 ### Helm chart + NetworkPolicies, kind smoke
 
-`deploy/helm/smoke.sh` stands up a throwaway kind cluster, loads the image,
+`charts/smoke.sh` stands up a throwaway kind cluster, loads the image,
 installs with the in-chart valkey and two replicas, and asserts: **8 passed,
 0 failed**: both replicas Ready on a valkey-backed readiness probe;
 `/healthz`, `/readyz`, `/metrics` reachable through the Service; the revocation
@@ -243,7 +243,7 @@ only proxy pods, never the same-named in-chart valkey. `helm lint` runs in CI.
 
 `make monitor-up` adds Prometheus (5 s scrape of both replicas' `:9090`) and
 Grafana with an auto-provisioned datasource and the committed dashboard
-(`deploy/dashboards/ozone-oidc-proxy.json`). Verified live: both scrape targets
+(`dashboards/ozone-oidc-proxy.json`). Verified live: both scrape targets
 `up`; the dashboard auto-loaded; and every one of the eight panel queries
 returns data during an e2e + loadtest run, sigv4 verification **p99 ~0.5 ms**
 (under the 1 ms threshold line), request-rate split by lane, verification
@@ -403,8 +403,8 @@ docker exec oidc-jupyter jupyter nbconvert --to notebook --execute \
 make ha-up && make e2e               # + HA/valkey/resign/revocation (78/78)
 make loadtest                        # p99 gate (fails if verification p99 ≥ 1 ms)
 make monitor-up                      # Prometheus + Grafana → http://localhost:3000
-./deploy/helm/smoke.sh               # Helm chart on a throwaway kind cluster (8/8)
+./charts/smoke.sh               # Helm chart on a throwaway kind cluster (8/8)
 make clean                           # tear down + delete volumes
-docker compose -f deploy/compose/docker-compose.yml exec ozone-om \
+docker compose -f examples/compose/docker-compose.yml exec ozone-om \
   cat /var/log/hadoop/om-audit-om.log   # attribution evidence
 ```

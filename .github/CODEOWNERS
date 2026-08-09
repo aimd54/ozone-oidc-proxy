@@ -25,4 +25,4 @@
 
 # The network is the trust boundary in this design, so the chart's policies
 # are as security-relevant as the code.
-/deploy/helm/ @aimd54
+/charts/ @aimd54

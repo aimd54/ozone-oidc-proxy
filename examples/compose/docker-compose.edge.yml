@@ -3,7 +3,7 @@
 #
 # TLS edge overlay: HAProxy in front of the proxy, modeling the production
 # ingress (the operator runs HAProxy with real certificates in production).
-# Run `deploy/compose/edge/gen-cert.sh` first (make edge-up does both).
+# Run `examples/compose/edge/gen-cert.sh` first (make edge-up does both).
 #
 #   docker compose -f docker-compose.yml -f docker-compose.edge.yml up -d
 #

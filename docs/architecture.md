@@ -371,8 +371,8 @@ Runtime dependencies are deliberately few: jwx, yaml, prometheus, valkey-go.
 /cmd/ozone-login/            # device-flow token helper for humans
 /cmd/credential-portal/      # browser credential page behind oauth2-proxy
 /internal/{config,oidc,sts,sigv4,store,forward,server,s3err,devicelogin}/
-/deploy/compose/             # runnable stack: Ozone + Keycloak + proxy
-/deploy/helm/                # Kubernetes chart + NetworkPolicies
+/examples/compose/             # runnable stack: Ozone + Keycloak + proxy
+/charts/                # Kubernetes chart + NetworkPolicies
 /docs/
 ```
 
@@ -456,7 +456,7 @@ verification-overhead histogram) and an `active_credentials` gauge.
 JSON logs: request id, username, AKID, issuer, lane, decision, **never**
 secrets, session tokens or raw JWTs.
 
-A Grafana dashboard is committed at `deploy/dashboards/`.
+A Grafana dashboard is committed at `dashboards/`.
 
 ## Ozone-side notes and constraints
 

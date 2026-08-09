@@ -18,7 +18,7 @@ if [ ! -x /opt/hadoop/bin/ozone ] && ! command -v ozone >/dev/null; then
     exit 1
 fi
 
-# carol authenticates via the stub second issuer (deploy/compose/stub-issuer).
+# carol authenticates via the stub second issuer (examples/compose/stub-issuer).
 for user in alice bob carol; do
     echo "Granting user:${user}:rwlc on /s3v"
     ozone sh volume addacl -a "user:${user}:rwlc" /s3v 2>/dev/null \

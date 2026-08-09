@@ -8,7 +8,7 @@
 # credential UX, the second issuer (stub IdP) and client smoke tests
 # (boto3, mc, s3a). Run from anywhere after `make up && make init`:
 #
-#   ./deploy/compose/scripts/e2e.sh
+#   ./examples/compose/scripts/e2e.sh
 #
 # Requires on the host: docker, curl, jq. AWS CLI runs containerized
 # (amazon/aws-cli) on the compose network, so it is not needed locally.

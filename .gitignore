@@ -2,7 +2,7 @@
 /bin/
 /dist/
 # A stray root-level build output; anchored so it never matches the Helm chart
-# directory of the same name under deploy/helm/.
+# directory of the same name under charts/.
 /ozone-oidc-proxy
 *.exe
 
@@ -23,8 +23,8 @@
 # OS
 .DS_Store
 
-# Lab TLS material, generated on demand by deploy/compose/edge/gen-cert.sh
-deploy/compose/edge/certs/
+# Lab TLS material, generated on demand by examples/compose/edge/gen-cert.sh
+examples/compose/edge/certs/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -7,7 +7,7 @@
 # an object through the proxy. Run after `make up && make init`, or use
 # `make demo`, which chains all three.
 #
-#   ./deploy/compose/scripts/demo.sh
+#   ./examples/compose/scripts/demo.sh
 #
 # The aws CLI runs containerized on the compose network, so it is not needed
 # on the host. For the full acceptance matrix, run `make e2e` instead.
@@ -99,6 +99,6 @@ Next:
   make portal-up                                              # browser credential page
 
 Clean up this bucket:
-  docker compose -f deploy/compose/docker-compose.yml exec ozone-om \\
+  docker compose -f examples/compose/docker-compose.yml exec ozone-om \\
     ozone sh bucket delete /s3v/$BUCKET
 EOF

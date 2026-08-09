@@ -22,7 +22,7 @@ issuers:
   - name: stub
     # Second issuer: a static stub standing in for a proprietary
     # IdP. Deliberately different audience and username claim to prove the
-    # per-issuer registry live. Test-only, see deploy/compose/stub-issuer/.
+    # per-issuer registry live. Test-only, see examples/compose/stub-issuer/.
     issuer: http://stub-issuer:8081
     audiences: [ozone-data]
     username_claim: uid

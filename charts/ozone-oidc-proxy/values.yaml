@@ -3,7 +3,7 @@
 
 replicaCount: 2
 
-# Defaults to the locally built image, which is what deploy/helm/smoke.sh
+# Defaults to the locally built image, which is what charts/smoke.sh
 # side-loads into kind. For a real cluster point this at a published tag, as
 # values-example.yaml does.
 image:

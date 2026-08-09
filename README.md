@@ -241,7 +241,7 @@ Its default access tokens carry `aud=account`, which the proxy rejects. Add an
 rather than realm-wide.
 
 The compose init service does all of it non-interactively
-(`deploy/compose/init/init.py`): the audience mapper, the device grant on the
+(`examples/compose/init/init.py`): the audience mapper, the device grant on the
 public client, and the confidential client the credential portal needs. It is
 readable as a worked configuration even if you run a different provider.
 
@@ -265,9 +265,9 @@ Everything else has a working default; the full reference is under
 ### On Kubernetes
 
 ```bash
-cp deploy/helm/ozone-oidc-proxy/values-example.yaml my-values.yaml
+cp charts/ozone-oidc-proxy/values-example.yaml my-values.yaml
 $EDITOR my-values.yaml      # issuer, s3_endpoint, s3gPodSelector, store key
-helm install ozpx deploy/helm/ozone-oidc-proxy -f my-values.yaml
+helm install ozpx charts/ozone-oidc-proxy -f my-values.yaml
 ```
 
 Use a values file rather than `--set`: `config.issuers` is a list of maps and
@@ -392,7 +392,7 @@ Buckets created through the proxy belong to the OIDC user. Cross-user grants
 use plain Ozone ACLs (architecture.md):
 
 ```bash
-docker compose -f deploy/compose/docker-compose.yml exec ozone-om \
+docker compose -f examples/compose/docker-compose.yml exec ozone-om \
   ozone sh bucket addacl -a user:bob:rl /s3v/demo            # bob may list/read
   # 'user:bob:rwl[DEFAULT]' additionally inherits to new keys
 ```
@@ -494,7 +494,7 @@ make monitor-up   # Prometheus + Grafana → http://localhost:3000 (anonymous vi
 ```
 
 Grafana auto-loads the **Ozone OIDC Proxy** dashboard
-(`deploy/dashboards/ozone-oidc-proxy.json`): traffic and verification-latency
+(`dashboards/ozone-oidc-proxy.json`): traffic and verification-latency
 percentiles (p99 against a 1 ms line), lane split, verification outcomes,
 upstream status families, active credentials, and revocations. Drive traffic
 with `make e2e` or `make loadtest` to populate it.
@@ -526,7 +526,7 @@ auth flow and ending with an Iceberg table written over these credentials.
 
 ### Kubernetes (Helm)
 
-`deploy/helm/ozone-oidc-proxy/` is a deployable chart: Deployment, Service,
+`charts/ozone-oidc-proxy/` is a deployable chart: Deployment, Service,
 ConfigMap, an optional store-key Secret and in-chart valkey, and the
 NetworkPolicies that make the network the trust boundary (the S3 Gateway
 accepts traffic **only** from proxy pods, rendered when you set
@@ -537,11 +537,11 @@ Ozone](#on-kubernetes) describes: `config.issuers` is a list of maps, so
 `--set` cannot express it, and the chart ships no default issuer.
 
 ```bash
-cp deploy/helm/ozone-oidc-proxy/values-example.yaml my-values.yaml
+cp charts/ozone-oidc-proxy/values-example.yaml my-values.yaml
 $EDITOR my-values.yaml
-helm install ozpx deploy/helm/ozone-oidc-proxy -f my-values.yaml
+helm install ozpx charts/ozone-oidc-proxy -f my-values.yaml
 
-./deploy/helm/smoke.sh    # lint + install on a throwaway kind cluster, then assert (8/8)
+./charts/smoke.sh    # lint + install on a throwaway kind cluster, then assert (8/8)
 ```
 
 `values-example.yaml` covers the multi-replica shape: two replicas on a

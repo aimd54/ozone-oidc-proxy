@@ -6,13 +6,13 @@
 BINARY  = bin/ozone-oidc-proxy
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 IMAGE   = ozone-oidc-proxy:dev
-COMPOSE        = docker compose -f deploy/compose/docker-compose.yml
-COMPOSE_PORTAL = $(COMPOSE) -f deploy/compose/docker-compose.portal.yml
-COMPOSE_HA      = $(COMPOSE) -f deploy/compose/docker-compose.ha.yml
-COMPOSE_MONITOR = $(COMPOSE) -f deploy/compose/docker-compose.monitor.yml
-COMPOSE_EDGE    = $(COMPOSE) -f deploy/compose/docker-compose.edge.yml
-COMPOSE_LAKE    = $(COMPOSE) -f deploy/compose/docker-compose.lakehouse.yml
-COMPOSE_ALL     = $(COMPOSE_PORTAL) -f deploy/compose/docker-compose.ha.yml -f deploy/compose/docker-compose.monitor.yml -f deploy/compose/docker-compose.edge.yml -f deploy/compose/docker-compose.lakehouse.yml
+COMPOSE        = docker compose -f examples/compose/docker-compose.yml
+COMPOSE_PORTAL = $(COMPOSE) -f examples/compose/docker-compose.portal.yml
+COMPOSE_HA      = $(COMPOSE) -f examples/compose/docker-compose.ha.yml
+COMPOSE_MONITOR = $(COMPOSE) -f examples/compose/docker-compose.monitor.yml
+COMPOSE_EDGE    = $(COMPOSE) -f examples/compose/docker-compose.edge.yml
+COMPOSE_LAKE    = $(COMPOSE) -f examples/compose/docker-compose.lakehouse.yml
+COMPOSE_ALL     = $(COMPOSE_PORTAL) -f examples/compose/docker-compose.ha.yml -f examples/compose/docker-compose.monitor.yml -f examples/compose/docker-compose.edge.yml -f examples/compose/docker-compose.lakehouse.yml
 
 help:
 	@echo "ozone-oidc-proxy, OIDC authentication for the Apache Ozone S3 Gateway"
@@ -28,7 +28,7 @@ help:
 	@echo "  make check         - All local gates (run before every commit)"
 	@echo "  make docker-build  - Build the proxy container image ($(IMAGE))"
 	@echo ""
-	@echo "Compose stack (deploy/compose): Keycloak + Ozone + proxy"
+	@echo "Compose stack (examples/compose): Keycloak + Ozone + proxy"
 	@echo "  make demo          - up + init + a real S3 round-trip (start here)"
 	@echo "  make up            - Build the image and start the stack"
 	@echo "  make init          - Provision Keycloak realm/users and Ozone volume ACLs"
@@ -95,13 +95,13 @@ init:
 
 # Shortest path from a clean checkout to a working S3 call.
 demo: up init
-	./deploy/compose/scripts/demo.sh
+	./examples/compose/scripts/demo.sh
 
 e2e:
-	./deploy/compose/scripts/e2e.sh
+	./examples/compose/scripts/e2e.sh
 
 loadtest:
-	./deploy/compose/scripts/loadtest.sh
+	./examples/compose/scripts/loadtest.sh
 
 portal-up: docker-build
 	$(COMPOSE_PORTAL) up -d --wait credential-portal oauth2-proxy || ($(COMPOSE_PORTAL) ps; exit 1)
@@ -111,13 +111,13 @@ portal-up: docker-build
 	@# Advisory here rather than fatal: the overlay is genuinely up, and the
 	@# acceptance suite reaches the issuer with curl --resolve, so it does not
 	@# need the hosts entry. Only a human with a browser does.
-	@./deploy/compose/scripts/check-hosts.sh || true
+	@./examples/compose/scripts/check-hosts.sh || true
 
 # Does this machine resolve the pinned issuer hostname? Browser sign-in and
 # ozone-login need it; the acceptance suite and the demo do not. Exits
 # non-zero when the entry is missing, so it can gate a script.
 check-hosts:
-	@./deploy/compose/scripts/check-hosts.sh
+	@./examples/compose/scripts/check-hosts.sh
 
 portal-down:
 	$(COMPOSE_PORTAL) rm -sf oauth2-proxy credential-portal
@@ -142,13 +142,13 @@ monitor-down:
 	$(COMPOSE_MONITOR) rm -sf grafana prometheus
 
 # TLS edge (models the production HAProxy ingress). Self-signed lab cert;
-# clients pin deploy/compose/edge/certs/edge.crt or disable verification.
+# clients pin examples/compose/edge/certs/edge.crt or disable verification.
 edge-up:
-	./deploy/compose/edge/gen-cert.sh
+	./examples/compose/edge/gen-cert.sh
 	$(COMPOSE_EDGE) up -d --wait haproxy || ($(COMPOSE_EDGE) ps; exit 1)
 	@echo ""
 	@echo "TLS edge: https://localhost:8443 (host) / https://haproxy:8443 (compose network)"
-	@echo "CA bundle for clients: deploy/compose/edge/certs/edge.crt"
+	@echo "CA bundle for clients: examples/compose/edge/certs/edge.crt"
 
 edge-down:
 	$(COMPOSE_EDGE) rm -sf haproxy
@@ -167,7 +167,7 @@ lakehouse-down:
 	$(COMPOSE_LAKE) rm -sf jupyter nessie nessie-token-refresher postgres
 
 lakehouse-smoke:
-	./deploy/compose/scripts/lakehouse-smoke.sh
+	./examples/compose/scripts/lakehouse-smoke.sh
 
 logs:
 	$(COMPOSE) logs -f

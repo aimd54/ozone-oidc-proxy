@@ -6,8 +6,8 @@
 # the proxy and fails unless the proxy-side verification overhead p99 stays
 # under 1 ms (read from the verification_duration_seconds histogram).
 #
-#   ./deploy/compose/scripts/loadtest.sh          # after make up && make init
-#   N=20000 C=50 ./deploy/compose/scripts/loadtest.sh
+#   ./examples/compose/scripts/loadtest.sh          # after make up && make init
+#   N=20000 C=50 ./examples/compose/scripts/loadtest.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +20,7 @@ N="${N:-5000}"
 C="${C:-20}"
 
 echo "== building loadtest binary"
-(cd "$ROOT" && CGO_ENABLED=0 go build -trimpath -o bin/loadtest ./deploy/compose/loadtest)
+(cd "$ROOT" && CGO_ENABLED=0 go build -trimpath -o bin/loadtest ./examples/compose/loadtest)
 
 echo "== minting temporary credentials (alice)"
 TOKEN=$(curl -sf "$KEYCLOAK_URL/realms/ozone/protocol/openid-connect/token" \
