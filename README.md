@@ -49,7 +49,7 @@ they would take any temporary key pair.
 Every row is exercised against a running cluster rather than asserted. The
 streamed `aws-chunked` upload from mc is read back byte-identical by s3a,
 and the evidence, with dates and image digests, is in
-[docs/VERIFICATION.md](docs/VERIFICATION.md).
+[docs/verification.md](docs/verification.md).
 
 Presigned URLs, multipart uploads and streaming all work. The fuller table,
 with the credential-lifecycle caveats per client, is in
@@ -140,9 +140,9 @@ make e2e     # the full acceptance suite
 
 > **Status.** Pre-1.0 and under active development. Everything claimed here is
 > verified live against a stock Ozone release
-> ([docs/VERIFICATION.md](docs/VERIFICATION.md)). The security review to date
+> ([docs/verification.md](docs/verification.md)). The security review to date
 > has been a self-review and the project has no production track record, so
-> read [docs/PRODUCTION.md](docs/PRODUCTION.md) before running it anywhere
+> read [docs/production.md](docs/production.md) before running it anywhere
 > real.
 
 Endpoints after `make up`:
@@ -187,7 +187,7 @@ any user.** Deploying this means making the network the security boundary,
 with the proxy as the only door.
 
 The Helm chart ships NetworkPolicies for exactly that, and
-[docs/PRODUCTION.md](docs/PRODUCTION.md) is the checklist.
+[docs/production.md](docs/production.md) is the checklist.
 
 Each user needs grants on the S3 volume. `rl` is the floor for any access;
 `rwlc` additionally lets them create their own buckets through the S3 API,
@@ -568,9 +568,9 @@ Further reading:
 | [docs/architecture.md](docs/architecture.md) | How the pieces fit, and what is trusted where |
 | [docs/adr/](docs/adr/README.md) | The decisions and their reasoning |
 | [docs/roadmap.md](docs/roadmap.md) | What is shipped, and what is not built |
-| [docs/PRODUCTION.md](docs/PRODUCTION.md) | Production checklist, and the Ranger note |
-| [docs/VERIFICATION.md](docs/VERIFICATION.md) | What was checked against a running cluster |
-| [docs/UPSTREAM.md](docs/UPSTREAM.md) | Upstream OIDC and STS work, and what would end this project |
+| [docs/production.md](docs/production.md) | Production checklist, and the Ranger note |
+| [docs/verification.md](docs/verification.md) | What was checked against a running cluster |
+| [docs/upstream.md](docs/upstream.md) | Upstream OIDC and STS work, and what would end this project |
 
 ## Why Ozone only?
 

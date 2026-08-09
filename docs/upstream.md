@@ -88,7 +88,7 @@ actually got, and the two do not currently agree.
 | Issuers | Single issuer (`ozone.sts.web.identity.issuer.uri`; flagged in review) | Multi-issuer registry, per-issuer audiences/username-claim, OIDC discovery |
 | Client contract | `POST /sts` form `Action=AssumeRoleWithWebIdentity` → AWS-shaped XML → SigV4 + `x-amz-security-token` | **Same, deliberately** (–) |
 | Hard dependency | A WebIdentity-capable authorizer: the default `generateAssumeRoleWithWebIdentitySessionPolicy` **fails closed** (`NOT_SUPPORTED_OPERATION`); the external Ranger Ozone authorizer must implement it, adoption needs an Ozone release *and* a Ranger release | None beyond stock 2.1.1 |
-| Status | Slated for 2.3.0 on the roadmap; branch unmerged, design review closed without a verdict, OIDC layer in draft | Implemented and verified live ([VERIFICATION.md](VERIFICATION.md)) |
+| Status | Slated for 2.3.0 on the roadmap; branch unmerged, design review closed without a verdict, OIDC layer in draft | Implemented and verified live ([verification.md](verification.md)) |
 
 Convergent details worth noting (independent validation of both designs):
 JWKS caching with debounced refresh-on-unknown-kid, fail-closed defaults,

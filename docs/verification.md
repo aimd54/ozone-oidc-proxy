@@ -51,7 +51,7 @@ Evidence, in increasing strength:
    `ozone sh bucket addacl -a user:bob:rl`.
 
 Upstream STS status is design-time research rather than a live check, and is
-tracked in [UPSTREAM.md](UPSTREAM.md).
+tracked in [upstream.md](upstream.md).
 
 ## Finding: CreateBucket requires WRITE on the volume
 
@@ -317,7 +317,7 @@ overlay models.
 
 Operational findings baked into the overlay:
 
-- The HAProxy healthcheck **is** the PRODUCTION.md boundary probe: an
+- The HAProxy healthcheck **is** the production.md boundary probe: an
   anonymous request through the edge must answer 403 (TLS handshake +
   backend routing + strict mode in one check). `localhost` resolves to
   `::1` inside the container while the frontend binds IPv4, the check

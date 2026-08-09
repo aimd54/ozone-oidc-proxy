@@ -7,7 +7,7 @@ where the trust boundaries sit.
 Decisions and their reasoning are recorded separately as
 [ADRs](adr/README.md). What is shipped and what is planned is in
 [the roadmap](roadmap.md), and what has actually been exercised against a
-running cluster is in [VERIFICATION.md](VERIFICATION.md).
+running cluster is in [verification.md](verification.md).
 
 ## Problem statement
 
@@ -22,7 +22,7 @@ There is no OIDC support. Ozone's STS work (HDDS-13323) lives on a feature
 branch; the `AssumeRoleWithWebIdentity` action is not implemented in any
 release. Authorization plumbing for STS is, however, already being backported
 into the 2.1.x line (HDDS-13848 and HDDS-15064), signaling
-active upstream movement ([upstream STS status](#upstream-sts-status), [UPSTREAM.md](UPSTREAM.md)).
+active upstream movement ([upstream STS status](#upstream-sts-status), [upstream.md](upstream.md)).
 
 Organizations that already run an OIDC identity provider therefore cannot use
 it for S3 access to Ozone: they must either deploy Kerberos everywhere, or
@@ -53,7 +53,7 @@ modifying or rebuilding Ozone**.
 - Not an identity provider; no user/group provisioning in the IdP or in Ozone.
 - No group-claim → Ozone-group synchronization ([groups](#groups)).
 - No Ranger integration (native ACLs first; Ranger is an Ozone-side authorizer
-  swap, see [PRODUCTION.md](PRODUCTION.md)).
+  swap, see [production.md](production.md)).
 - No request-body integrity beyond standard SigV4 semantics.
 - No UI beyond the optional credential portal ([the oauth2-proxy satellite](#oauth2-proxy-an-official-satellite)).
 
@@ -271,7 +271,7 @@ Structurally valid for `AuthorizationV4HeaderParser` → `SignatureInfo` populat
 with `awsAccessId=<username>` → OM attributes the request and evaluates native
 ACLs. Unsecured mode validates nothing further. `X-Amz-Security-Token` is
 stripped before forwarding. **Verified end to end against a stock Ozone**
-([VERIFICATION.md](VERIFICATION.md)).
+([verification.md](verification.md)).
 
 Two forward modes (`upstream.forward_mode`):
 
@@ -443,7 +443,7 @@ applies to every Ozone port (OM RPC, SCM, DataNodes), not just the gateway.
 signature is; [SigV4 verification](#sigv4-verification-on-the-data-path)).
 
 Deployment hardening beyond the code, TLS, secret management, rate limiting,
-audit retention, is checklisted in [PRODUCTION.md](PRODUCTION.md).
+audit retention, is checklisted in [production.md](production.md).
 
 ## Observability
 
@@ -470,7 +470,7 @@ ozone.acl.authorizer.class = org.apache.hadoop.ozone.security.acl.OzoneNativeAut
 
 Development tracks the current Ozone release, and the version actually
 exercised is recorded with its image digest in
-[VERIFICATION.md](VERIFICATION.md). Run a recent patch release on JDK 17 or
+[verification.md](verification.md). Run a recent patch release on JDK 17 or
 newer: HDDS-14858 breaks Ozone Manager operations on JDK 11 and earlier.
 
 ### ACL bootstrap
@@ -493,7 +493,7 @@ ozone sh bucket addacl -a "user:alice:rwl[DEFAULT]" /s3v/<bucket> # key inherita
   now enforce ACLs (previously unchecked). Multipart workflows need LIST/READ on
   the bucket; setups that "worked" on ≤ 2.1.0 may now 403. → Covered by the e2e
   multipart matrix: `user:X:rl` on the bucket suffices
-  ([VERIFICATION.md](VERIFICATION.md)).
+  ([verification.md](verification.md)).
 
 ### Groups
 
@@ -518,7 +518,7 @@ STS session policies.
 This project deliberately mirrors the AWS client contract, so if and when
 native support ships, migration is an endpoint swap plus an ACL→policy
 translation rather than a client rewrite. Status tracking, a design comparison
-and a watch list live in [UPSTREAM.md](UPSTREAM.md).
+and a watch list live in [upstream.md](upstream.md).
 
 ## Alternatives considered
 

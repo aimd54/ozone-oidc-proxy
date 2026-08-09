@@ -26,7 +26,7 @@ services:
       - proxy
     healthcheck:
       # Healthy = TLS handshake succeeds AND the strict proxy answers the
-      # anonymous probe with 403 (the PRODUCTION.md boundary check): proves
+      # anonymous probe with 403 (the production.md boundary check): proves
       # edge TLS, routing to the backend, and that strict mode is alive.
       # 127.0.0.1, not localhost: the container resolves localhost to ::1
       # first and the frontend binds IPv4.

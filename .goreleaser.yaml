@@ -135,4 +135,4 @@ release:
     cosign (keyless); see `.goreleaser.yaml` for the verify command.
 
     This proxy authenticates requests to a gateway that authenticates none of
-    its own. Read `docs/PRODUCTION.md` before deploying it.
+    its own. Read `docs/production.md` before deploying it.

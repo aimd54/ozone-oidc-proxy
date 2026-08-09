@@ -77,7 +77,7 @@ What that means in practice:
 - Changes to lane dispatch, forwarding or ACL behaviour get a case in the
   `make e2e` suite, which runs against a real Ozone cluster. Assert the state
   you expect (bucket owner, S3 error code), not merely that a command exited 0.
-- Live verification results belong in [docs/VERIFICATION.md](docs/VERIFICATION.md)
+- Live verification results belong in [docs/verification.md](docs/verification.md)
   with the date and what was run.
 
 ## Code conventions

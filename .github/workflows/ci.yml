@@ -4,7 +4,7 @@
 # Lint, unit tests, chart rendering, a binary build and a vulnerability scan.
 # The end-to-end suite (make e2e) needs Docker plus a full Ozone + Keycloak
 # stack (~6 GB RAM), so it stays a local step; its results are recorded in
-# docs/VERIFICATION.md.
+# docs/verification.md.
 name: CI
 
 # Documentation-only changes skip this workflow entirely; markdown linting

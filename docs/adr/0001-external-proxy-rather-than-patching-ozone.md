@@ -53,4 +53,4 @@ rebuilding their tooling.
 - Revisit when upstream ships `AssumeRoleWithWebIdentity` in a release
   together with an authorizer that implements it. At that point this proxy
   becomes a migration path rather than a destination, and
-  [UPSTREAM.md](../UPSTREAM.md) tracks the gap.
+  [upstream.md](../upstream.md) tracks the gap.

@@ -16,7 +16,7 @@ key ID to the Ozone Manager, which derives the request user from it and
 evaluates ACLs against that user. With `ozone.security.enabled=false`, **only
 signature validation is skipped**: attribution and ACL evaluation still happen.
 Verified live against a running cluster, recorded in
-[VERIFICATION.md](../VERIFICATION.md).
+[verification.md](../verification.md).
 
 Separately, SigV4 never transmits the secret. A client sends an HMAC derived
 from it, so a proxy cannot validate credentials it did not mint. The token has

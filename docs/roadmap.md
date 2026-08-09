@@ -35,7 +35,7 @@ next, and what has deliberately not been built.
 ## Verified against a running cluster
 
 Recorded with dates, image digests, and the commands used in
-[VERIFICATION.md](VERIFICATION.md), including the findings that changed the
+[verification.md](verification.md), including the findings that changed the
 implementation. boto3, mc and s3a are each exercised against a running
 cluster, including an 8 MiB streaming upload read back byte-identical by a
 different client, and a lakehouse walkthrough exercises table writes over
@@ -87,10 +87,10 @@ separates this list from the one below.
   accepted and forwarded; each chunk's signature is not independently verified.
 - **Apache Ranger as the authorizer**, in place of native ACLs. The design
   supports the swap by construction because authorization stays in Ozone, but
-  it has not been exercised here. See [PRODUCTION.md](PRODUCTION.md).
+  it has not been exercised here. See [production.md](production.md).
 - **Group claims mapped to Ozone groups.** Out of scope by choice; identity is
   a user, and grouping belongs to whatever manages Ozone's own groups.
 - **Migration to native Ozone STS.** The endpoint does not exist in a release
   yet. The exchange stays API-compatible so that migration is a change of
-  endpoint URL rather than of tooling; [UPSTREAM.md](UPSTREAM.md) tracks the
+  endpoint URL rather than of tooling; [upstream.md](upstream.md) tracks the
   upstream work.

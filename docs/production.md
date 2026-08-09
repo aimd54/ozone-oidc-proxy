@@ -1,7 +1,7 @@
 # Production readiness, checklist and posture
 
 The compose stack in this repository is a **lab**: it is what the
-[verification record](VERIFICATION.md) runs against, not a production
+[verification record](verification.md) runs against, not a production
 deployment. This document is the gap between the two.
 
 The expected shape is the proxy behind a TLS edge (the compose `edge`
@@ -9,7 +9,7 @@ overlay models one with HAProxy), with the S3 Gateway unreachable by anything
 else. The identity provider is assumed to be operated and hardened
 separately; this document focuses on what *this* project must get right.
 Threat model: [architecture.md](architecture.md); the native-Ozone alternative and its
-migration path: [UPSTREAM.md](UPSTREAM.md).
+migration path: [upstream.md](upstream.md).
 
 ## Must-have before production
 
@@ -65,7 +65,7 @@ migration path: [UPSTREAM.md](UPSTREAM.md).
   pinned digest. The proxy *is* the security boundary, a tampered image
   removes it silently.
 - [ ] **External security review.** The self-review
-  ([VERIFICATION.md](VERIFICATION.md)) was a self-review; get a second
+  ([verification.md](verification.md)) was a self-review; get a second
   pair of eyes before real data.
 - [ ] **Disable the Bearer lane** (`data_path.accept_bearer: false`).
   It puts long-lived JWTs on every request; SigV4 with short-lived minted
@@ -116,6 +116,6 @@ What does change is identity plumbing, plan for these:
 
 If the native OIDC/STS effort (apache/ozone#10266 on the HDDS-13323 STS
 branch) merges and releases, re-evaluate against
-[UPSTREAM.md](UPSTREAM.md): the client contract matches deliberately, so
+[upstream.md](upstream.md): the client contract matches deliberately, so
 migration is an endpoint swap plus ACL→Ranger policy translation, not a
 client rewrite.

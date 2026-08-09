@@ -60,7 +60,7 @@ Out of scope, because they are documented properties rather than defects:
   internal; the compose stack binds it to localhost and the Helm chart puts it
   behind a NetworkPolicy.
 - Reaching the Ozone S3 Gateway directly, bypassing the proxy: preventing that
-  is the deployment's job ([docs/PRODUCTION.md](docs/PRODUCTION.md)).
+  is the deployment's job ([docs/production.md](docs/production.md)).
 - The compose stack and its Keycloak realm, the stub issuer, the self-signed
   edge certificate and the Jupyter notebook are a **lab**: they ship insecure
   defaults on purpose (password grants, an unauthenticated token mint, no TLS
@@ -69,8 +69,8 @@ Out of scope, because they are documented properties rather than defects:
 ## Project status
 
 Pre-1.0 and under active development. The security review to date has been a
-self-review, recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md), and the
+self-review, recorded in [docs/verification.md](docs/verification.md), and the
 project has no production track record;
-[docs/PRODUCTION.md](docs/PRODUCTION.md) lists what a real deployment still
+[docs/production.md](docs/production.md) lists what a real deployment still
 needs. Independent review is very welcome, and findings against the guarantees
 above are the most useful kind.
