@@ -4,11 +4,11 @@
 #
 # End-to-end test suite for the compose stack: the acceptance criteria of
 # architecture.md, presigned URLs, the multipart matrix
-# (2.1.1 ListParts/ListMultipartUploads ACL enforcement), the human
-# credential UX, the second issuer (stub IdP) and client smoke tests
+# (ListParts/ListMultipartUploads ACL enforcement, HDDS-14898/14894), the
+# human credential UX, the second issuer (stub IdP) and client smoke tests
 # (boto3, mc, s3a). Run from anywhere after `make up && make init`:
 #
-#   ./examples/compose/scripts/e2e.sh
+#   bash ./examples/compose/scripts/e2e.sh
 #
 # Requires on the host: docker, curl, jq. AWS CLI runs containerized
 # (amazon/aws-cli) on the compose network, so it is not needed locally.
@@ -138,7 +138,7 @@ expect_ok "alice: aws s3 mb s3://$BUCKET" \
 
 OWNER=$($COMPOSE exec -T ozone-om ozone sh bucket info "/s3v/$BUCKET" 2>/dev/null | jq -r '.owner // empty')
 if [ "$OWNER" = "alice" ]; then
-    ok "bucket owner attributed to OIDC user (owner=alice): synthetic header accepted by stock 2.1.1"
+    ok "bucket owner attributed to OIDC user (owner=alice): synthetic header accepted by a stock Ozone"
 else
     ko "bucket owner attributed to OIDC user" "owner='$OWNER', expected 'alice'"
 fi
@@ -163,7 +163,7 @@ expect_ok "grant user:bob:rl on /s3v/$BUCKET (ozone sh)" \
 expect_ok "bob can list after the grant" \
     aws_as "$B_AKID" "$B_SECRET" "$B_SESSION" s3 ls "s3://$BUCKET"
 
-step "Multipart uploads (2.1.1 ListParts/ListMultipartUploads ACL matrix)"
+step "Multipart uploads (ListParts / ListMultipartUploads ACL matrix, HDDS-14898/14894)"
 MPU_BUCKET="mpu-test-$RANDOM"
 MPU_KEY="assembled.bin"
 WORK=$(mktemp -d)

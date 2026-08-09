@@ -6,10 +6,10 @@
 #   docker compose exec ozone-om bash /scripts/setup-volume-acls.sh
 #
 # Grants on the S3 volume /s3v:
-#   r (read) + l (list)   , required for any S3 traversal
+#   r (read) + l (list):    required for any S3 traversal
 #   w (write) + c (create): bucket creation through the S3 API: OM checks
-#                            WRITE on the volume for CreateBucket (verified
-#                            against 2.1.1 via om-audit)
+#                            WRITE on the volume for CreateBucket (confirmed
+#                            in the om-audit log)
 # Per-bucket grants stay per-user/per-bucket (see the e2e script).
 set -e
 

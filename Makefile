@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: help build test vet fmt-check lint tidy-check lint-docs check docker-build up init demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
+.PHONY: help build test vet fmt-check lint tidy-check lint-docs check docker-build up init init-stack demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
 
 BINARY  = bin/ozone-oidc-proxy
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -87,21 +87,26 @@ up: docker-build
 	@echo ""
 	@echo "Stack is up. Next: make init"
 
-init:
+# The provisioning itself. demo depends on this rather than on init, so that
+# the closing pointer below is only shown to someone who ran init on its own.
+init-stack:
 	$(COMPOSE) run --rm --build init-service
 	$(COMPOSE) exec ozone-om bash /scripts/setup-volume-acls.sh
+
+init: init-stack
 	@echo ""
 	@echo "Initialization done. Next: make demo"
 
-# Shortest path from a clean checkout to a working S3 call.
-demo: up init
-	./examples/compose/scripts/demo.sh
+# Shortest path from a clean checkout to a working S3 call. Builds first: the
+# closing text names bin/ozone-login, which has to exist by then.
+demo: build up init-stack
+	bash ./examples/compose/scripts/demo.sh
 
 e2e:
-	./examples/compose/scripts/e2e.sh
+	bash ./examples/compose/scripts/e2e.sh
 
 loadtest:
-	./examples/compose/scripts/loadtest.sh
+	bash ./examples/compose/scripts/loadtest.sh
 
 portal-up: docker-build
 	$(COMPOSE_PORTAL) up -d --wait credential-portal oauth2-proxy || ($(COMPOSE_PORTAL) ps; exit 1)
@@ -111,13 +116,13 @@ portal-up: docker-build
 	@# Advisory here rather than fatal: the overlay is genuinely up, and the
 	@# acceptance suite reaches the issuer with curl --resolve, so it does not
 	@# need the hosts entry. Only a human with a browser does.
-	@./examples/compose/scripts/check-hosts.sh || true
+	@bash ./examples/compose/scripts/check-hosts.sh || true
 
 # Does this machine resolve the pinned issuer hostname? Browser sign-in and
 # ozone-login need it; the acceptance suite and the demo do not. Exits
 # non-zero when the entry is missing, so it can gate a script.
 check-hosts:
-	@./examples/compose/scripts/check-hosts.sh
+	@bash ./examples/compose/scripts/check-hosts.sh
 
 portal-down:
 	$(COMPOSE_PORTAL) rm -sf oauth2-proxy credential-portal
@@ -144,7 +149,7 @@ monitor-down:
 # TLS edge (models the production HAProxy ingress). Self-signed lab cert;
 # clients pin examples/compose/edge/certs/edge.crt or disable verification.
 edge-up:
-	./examples/compose/edge/gen-cert.sh
+	bash ./examples/compose/edge/gen-cert.sh
 	$(COMPOSE_EDGE) up -d --wait haproxy || ($(COMPOSE_EDGE) ps; exit 1)
 	@echo ""
 	@echo "TLS edge: https://localhost:8443 (host) / https://haproxy:8443 (compose network)"
@@ -167,7 +172,7 @@ lakehouse-down:
 	$(COMPOSE_LAKE) rm -sf jupyter nessie nessie-token-refresher postgres
 
 lakehouse-smoke:
-	./examples/compose/scripts/lakehouse-smoke.sh
+	bash ./examples/compose/scripts/lakehouse-smoke.sh
 
 logs:
 	$(COMPOSE) logs -f
