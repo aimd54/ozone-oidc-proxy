@@ -391,6 +391,63 @@ the owner check reads empty rather than passing when the bucket is missing).
 
 Base suite on the same tree: **69 passed, 0 failed**.
 
+## Kubernetes, Ozone from its official chart (2026-08-10)
+
+The first evidence from outside compose. Ozone installed from the official
+chart rather than hand-written manifests, this proxy in front of it, both as
+Helm releases on a kind cluster.
+
+| Component | Version |
+| --- | --- |
+| Apache Ozone chart | `ozone/ozone` 0.3.0 (appVersion 2.1.1) |
+| Apache Ozone image | `apache/ozone@sha256:2fef7c97b3a8...` (tag 2.1.1) |
+| Keycloak | `quay.io/keycloak/keycloak@sha256:09a381c715ab...` (tag 26.0) |
+| Kubernetes | v1.36.1 on kind 0.32.0, single node |
+| Helm | v4.2.2 |
+| ozone-oidc-proxy | built from this tree, one replica, memory store |
+
+Ozone ran with one Datanode, one Ozone Manager, one SCM and one S3 Gateway,
+with `ozone.security.enabled=false`, `ozone.acl.enabled=true` and the native
+authorizer. Keycloak imported a realm at startup carrying the audience mapper.
+Everything below passed:
+
+- Keycloak issued a token for alice carrying `aud=ozone-s3` and
+  `preferred_username=alice`, signed RS256.
+- The proxy's STS exchanged it for temporary credentials (`OZPX...`).
+- An object put and got back through the proxy round-tripped byte-identical.
+- `ozone sh bucket info` reported **`owner: alice`**: Ozone attributed the
+  request to the OIDC user, on Kubernetes, exactly as it does under compose.
+- `ozone sh key info` reported the object present at its exact size.
+- An unauthenticated request was refused with 403 `AccessDenied`.
+- A pod attempting to reach the S3 Gateway directly got no connection at all,
+  so the chart's lockdown NetworkPolicy is enforced and not merely rendered.
+
+The lockdown check was confirmed to discriminate: deleting
+`ozpx-ozone-oidc-proxy-s3g-lockdown` turned the same probe from no connection
+into `HTTP 403` from the gateway itself, and restoring the policy blocked it
+again.
+
+### Finding: the Ozone chart cannot be scaled below three Datanodes
+
+Chart 0.3.0 pins `hdds.scm.safemode.min.datanode` to `"3"` in
+`templates/_helpers.tpl`, with no value exposed to override it and no
+reference to `datanode.replicas`. A single-Datanode install therefore never
+satisfies the safe-mode rule: SCM stays in safe mode, `allocateBlock` fails
+with `SCM_IN_SAFE_MODE`, and a write hangs until the client gives up. The aws
+CLI reports its bytes transferred first, so the object appears to upload and
+is then absent, which presents as a proxy fault and is not one.
+`ozone admin safemode exit` clears it for a lab. Three or more Datanodes need
+none of this.
+
+### Finding: the proxy egress policy must name an in-cluster issuer
+
+The chart's issuer egress defaults to any peer on port 443, which suits a
+provider reached over TLS from outside the cluster. An in-cluster Keycloak on
+plain HTTP is denied by that policy, and every token exchange returns
+`IDPCommunicationError`. Setting `networkPolicy.issuerEgress` to the issuer's
+pod selector and `issuerEgressPorts` to its port fixes it, and is tighter than
+the default.
+
 ## Reproduce
 
 ```bash
@@ -404,6 +461,7 @@ make ha-up && make e2e               # + HA/valkey/resign/revocation (78/78)
 make loadtest                        # p99 gate (fails if verification p99 ≥ 1 ms)
 make monitor-up                      # Prometheus + Grafana → http://localhost:3000
 ./charts/smoke.sh               # Helm chart on a throwaway kind cluster (8/8)
+bash examples/kubernetes/up.sh       # Ozone from its official chart + the proxy, on kind
 make clean                           # tear down + delete volumes
 docker compose -f examples/compose/docker-compose.yml exec ozone-om \
   cat /var/log/hadoop/om-audit-om.log   # attribution evidence
