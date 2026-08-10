@@ -96,8 +96,8 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Format, vet, tidy, race-enabled unit tests
-        run: make fmt-check vet tidy-check test
+      - name: Format, vet, tidy, attribution, race-enabled unit tests
+        run: make fmt-check vet tidy-check notice-check test
 
   helm:
     name: Helm chart

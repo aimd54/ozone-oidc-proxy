@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: help build test vet fmt-check lint tidy-check lint-docs check docker-build up init init-stack demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
+.PHONY: help build test vet fmt-check lint tidy-check notice notice-check lint-docs check docker-build up init init-stack demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
 
 BINARY  = bin/ozone-oidc-proxy
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -24,6 +24,8 @@ help:
 	@echo "  make fmt-check     - Fail if any file needs gofmt"
 	@echo "  make lint          - Run golangci-lint (v2)"
 	@echo "  make tidy-check    - Fail if go.mod/go.sum are not tidy"
+	@echo "  make notice        - Regenerate NOTICE from the linked module graph"
+	@echo "  make notice-check  - Fail if NOTICE no longer matches that graph"
 	@echo "  make lint-docs     - Lint markdown (requires Node)"
 	@echo "  make check         - All local gates (run before every commit)"
 	@echo "  make docker-build  - Build the proxy container image ($(IMAGE))"
@@ -73,11 +75,21 @@ lint:
 tidy-check:
 	go mod tidy -diff
 
+# NOTICE is generated from the modules actually linked into the released
+# binaries, across every platform in the release matrix. A dependency bump
+# announces nothing about attribution, so the check is what keeps the file
+# honest.
+notice:
+	go run ./hack/gennotice
+
+notice-check:
+	go run ./hack/gennotice -check
+
 lint-docs:
 	npx --yes markdownlint-cli2 "**/*.md"
 
 # All local gates; run before every commit. CI runs the same set.
-check: fmt-check vet lint tidy-check test
+check: fmt-check vet lint tidy-check notice-check test
 
 docker-build:
 	docker build -t $(IMAGE) --build-arg VERSION=$(VERSION) .
