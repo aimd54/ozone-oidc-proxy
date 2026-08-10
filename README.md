@@ -105,6 +105,11 @@ Needs Docker, GNU make and Go. First run pulls several gigabytes.
 and its six overlays: high availability, monitoring, a TLS edge, the
 credential portal, a load test, and an Iceberg lakehouse.
 
+On Kubernetes, [examples/kubernetes/](examples/kubernetes/README.md) does the
+same thing with two Helm releases on a kind cluster: Apache Ozone from its
+official chart, Keycloak, and this proxy, with the NetworkPolicy that keeps
+the S3 Gateway reachable by nothing else.
+
 ## Against your own Ozone
 
 Two prerequisites decide whether this fits your cluster:

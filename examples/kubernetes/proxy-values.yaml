@@ -1,0 +1,59 @@
+# Values for this project's chart, pointed at the Ozone release installed from
+# ozone-values.yaml and the Keycloak in keycloak.yaml.
+#
+#   helm install ozpx ../../charts/ozone-oidc-proxy -f proxy-values.yaml
+#
+# config.issuers is a list of maps, which --set cannot express, so a values
+# file is the only way to configure an issuer at all.
+
+image:
+  repository: ozone-oidc-proxy
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# One replica, because this example leaves credential_store on its "memory"
+# default. A credential minted on one replica is unknown to the others, so a
+# client would see intermittent InvalidAccessKeyId. Running more than one
+# replica means switching the store to valkey; the chart warns about exactly
+# this combination on install.
+replicaCount: 1
+
+config:
+  upstream:
+    # The Ozone chart's S3 Gateway service. This address is the only thing the
+    # proxy needs to know about the cluster behind it.
+    s3_endpoint: http://ozone-s3g-rest:9878
+
+  issuers:
+    - name: keycloak
+      # Must equal the token's iss claim byte for byte. Keycloak is pinned to
+      # this hostname so the two agree.
+      issuer: http://keycloak:8080/realms/ozone
+      # Enforced, and never empty: an issuer without audiences is rejected at
+      # startup. Keycloak emits this because the realm adds an audience mapper.
+      audiences: [ozone-s3]
+      username_claim: preferred_username
+
+networkPolicy:
+  enabled: true
+  # The whole trust model in one setting. Ozone runs with security disabled, so
+  # anything that can reach the S3 Gateway can act as any user. This selector
+  # renders the policy that lets only proxy pods reach it. Leave it unset and
+  # no lockdown policy is rendered at all, which on a real cluster means every
+  # pod in the namespace can impersonate anyone.
+  s3gPodSelector:
+    app.kubernetes.io/name: ozone
+    app.kubernetes.io/component: s3g
+
+  # The proxy fetches JWKS from the issuer, so the egress policy has to admit
+  # it. The chart defaults to any peer on 443, which suits an identity
+  # provider reached over TLS off-cluster. Keycloak here is in-cluster and
+  # plain HTTP, so both the peer and the port need saying. Scoping to the pod
+  # is tighter than the default: without these two lines the proxy answers
+  # every exchange with IDPCommunicationError, which is the policy working
+  # rather than failing.
+  issuerEgress:
+    - podSelector:
+        matchLabels:
+          app: keycloak
+  issuerEgressPorts: [8080]

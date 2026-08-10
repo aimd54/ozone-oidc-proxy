@@ -1,0 +1,66 @@
+# Values for the official Apache Ozone chart, sized for a laptop kind cluster.
+#
+#   helm install ozone ozone/ozone --version 0.3.0 -f ozone-values.yaml
+#
+# The three settings this proxy actually depends on are the security, ACL and
+# authorizer ones below. Everything else here only makes a single-node cluster
+# fit on one machine.
+
+image:
+  repository: apache/ozone
+  tag: 2.1.1
+  pullPolicy: IfNotPresent
+
+# One of each. The chart defaults to three Datanodes and three Ozone Managers,
+# which is the shape you want in production and not one that fits here.
+datanode:
+  replicas: 1
+om:
+  replicas: 1
+scm:
+  replicas: 1
+s3g:
+  replicas: 1
+
+env:
+  # The trust model this proxy is built on. Ozone runs unsecured, so it
+  # authenticates nobody, and attributes each request to whatever username the
+  # access key id field carries. The proxy is what authenticates, and it is why
+  # the S3 Gateway must never be reachable by anything else.
+  - name: OZONE-SITE.XML_ozone.security.enabled
+    value: "false"
+  # Attribution alone would be useless without these two: they are what makes
+  # Ozone enforce per-user ACLs on the identity the proxy injects.
+  - name: OZONE-SITE.XML_ozone.acl.enabled
+    value: "true"
+  - name: OZONE-SITE.XML_ozone.acl.authorizer.class
+    value: org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
+
+  # Single-node sizing.
+  - name: OZONE-SITE.XML_ozone.server.default.replication
+    value: "1"
+  - name: OZONE-SITE.XML_ozone.scm.container.size
+    value: 1GB
+  - name: OZONE-SITE.XML_ozone.scm.block.size
+    value: 1MB
+  - name: OZONE-SITE.XML_hdds.datanode.volume.min.free.space
+    value: 100MB
+  - name: OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min
+    value: 10MB
+  # ozone.datanode.pipeline.limit and hdds.scm.safemode.min.datanode are set by
+  # the chart from datanode.replicas above, so they are deliberately absent
+  # here: a duplicate env key is rejected by server-side apply.
+  - name: OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit
+    value: 30s
+  - name: OZONE-SITE.XML_hdds.heartbeat.interval
+    value: 5s
+  - name: OZONE-SITE.XML_ozone.scm.pipeline.creation.interval
+    value: 30s
+  - name: OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count
+    value: "1"
+  - name: OZONE-SITE.XML_ozone.http.basedir
+    value: /tmp/ozone_http
+
+  # Keep every JVM small enough that four of them coexist on one laptop.
+  - name: OZONE_OPTS
+    value: -Xmx512m -Xms128m

@@ -13,5 +13,8 @@
 | [roadmap.md](roadmap.md) | Working, verified, and deliberately not built |
 | [adr/](adr/README.md) | The decisions and the reasoning behind them |
 
-The [compose lab](../examples/compose/README.md) has its own guide, covering
-the stack it starts and the six overlays that extend it.
+Two worked examples have their own guides: the [compose
+lab](../examples/compose/README.md), covering the stack it starts and the six
+overlays that extend it, and the [Kubernetes
+example](../examples/kubernetes/README.md), which runs Apache Ozone from its
+official chart and this proxy in front of it on kind.

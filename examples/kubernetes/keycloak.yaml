@@ -1,0 +1,74 @@
+# Keycloak for the example, in development mode with the realm imported at
+# startup. Development mode is what makes this one manifest instead of a
+# database, a hostname and TLS: it is not a deployment shape to copy.
+#
+# The realm it imports is the part worth reading. Its client carries an
+# audience mapper, because Keycloak's default access token has aud=account
+# and this proxy rejects a token whose aud does not match the audiences it
+# was configured with. That check is mandatory and is the setting most
+# likely to need work against any provider.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          args: ["start-dev", "--import-realm"]
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: admin123
+            # Tokens must carry an issuer the proxy can match byte for byte,
+            # and the proxy resolves it over the cluster network. Pinning the
+            # hostname is what keeps the two agreeing.
+            - name: KC_HOSTNAME
+              value: http://keycloak:8080
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: JAVA_OPTS_KC_HEAP
+              value: -Xmx512m -Xms128m
+          ports:
+            - containerPort: 8080
+            - containerPort: 9000
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              # Keycloak 26 serves health on the management port, not 8080.
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 40
