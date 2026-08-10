@@ -27,7 +27,9 @@ next, and what has deliberately not been built.
 - **Revocation.** An administrative endpoint deletes a credential, taking
   effect across replicas.
 - **Deployment.** A Helm chart with network policies, a compose stack for
-  local work, and a Prometheus and Grafana overlay.
+  local work, and a Prometheus and Grafana overlay. A worked Kubernetes
+  example runs Ozone from its own official chart with the proxy in front of
+  it, so the deployment path is exercised rather than described.
 - **Signed releases.** Binaries for linux and darwin on amd64 and arm64, each
   archive carrying an SBOM, with the checksums signed keylessly and build
   provenance attested. A distroless container image is published alongside.
@@ -40,6 +42,12 @@ implementation. boto3, mc and s3a are each exercised against a running
 cluster, including an 8 MiB streaming upload read back byte-identical by a
 different client, and a lakehouse walkthrough exercises table writes over
 these credentials.
+
+On Kubernetes, the same attribution was confirmed against Ozone installed
+from its official Helm chart: a bucket created through the proxy is owned by
+the OIDC user, and a pod that tries to reach the S3 Gateway directly cannot,
+so the network policy holding the trust boundary is enforced rather than only
+rendered.
 
 Verification tracks the current Ozone release. The exact build under test is in
 that record rather than in prose that would go stale.
