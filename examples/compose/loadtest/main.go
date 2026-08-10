@@ -99,18 +99,44 @@ func main() {
 	fmt.Printf("client latency: p50=%s p95=%s p99=%s\n",
 		q(0.50).Round(10*time.Microsecond), q(0.95).Round(10*time.Microsecond), q(0.99).Round(10*time.Microsecond))
 
-	bound, total, ok := p99Bound(before, after)
+	bound, total, ok := quantileBound(before, after, 0.99)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "no verification_duration_seconds sigv4 samples recorded during the run")
 		os.Exit(1)
 	}
-	fmt.Printf("proxy sigv4 verification: samples=%d p99 <= %.3fms (histogram bucket bound)\n", total, bound*1000)
+	p50, _, _ := quantileBound(before, after, 0.50)
+	p95, _, _ := quantileBound(before, after, 0.95)
+	mean := meanMs(before, after)
+
+	// The whole distribution, not just the gated number: a run that fails only
+	// at the tail looks very different from one that is slow throughout, and
+	// the bounds alone cannot tell them apart.
+	fmt.Printf("proxy sigv4 verification (%d samples, histogram bucket bounds)\n", total)
+	fmt.Printf("  p50  %s\n", fmtBound(p50))
+	fmt.Printf("  mean    %7.3fms  (exact)\n", mean)
+	fmt.Printf("  p95  %s\n", fmtBound(p95))
+	fmt.Printf("  p99  %s\n", fmtBound(bound))
+
 	if errs.Load() > 0 {
 		fmt.Fprintln(os.Stderr, "FAIL: request errors")
 		os.Exit(1)
 	}
 	if bound*1000 > *limitMs {
-		fmt.Fprintf(os.Stderr, "FAIL: verification p99 bound %.3fms exceeds limit %.3fms\n", bound*1000, *limitMs)
+		fmt.Fprintf(os.Stderr, "\nFAIL: verification p99 bound %.3fms exceeds limit %.3fms\n", bound*1000, *limitMs)
+		// A fast median with a slow tail is what host contention looks like:
+		// the verification work itself fits the budget and the wall clock does
+		// not, because the goroutine was not running for part of it. Saying so
+		// is the difference between this failure and a real regression.
+		if p50*1000 <= *limitMs && mean <= *limitMs {
+			fmt.Fprintf(os.Stderr,
+				"\n  The median and mean are inside the budget, so the verification\n"+
+					"  path itself is not slow; only the tail is. That is usually the\n"+
+					"  host rather than the proxy. Check load average, swap usage and\n"+
+					"  the CPU frequency governor, then re-run against an otherwise\n"+
+					"  idle stack. This run achieved %.0f req/s; the conditions the\n"+
+					"  recorded figures were taken under are in docs/verification.md.\n",
+				float64(*n)/elapsed.Seconds())
+		}
 		os.Exit(1)
 	}
 	fmt.Printf("PASS: verification p99 < %.1fms\n", *limitMs)
@@ -148,45 +174,60 @@ func do(client *http.Client, endpoint, method, bucket, key string, body io.Reade
 	return nil
 }
 
-// buckets scrapes cumulative verification_duration_seconds sigv4 bucket
-// counts, keyed by the "le" value (+Inf included).
-func buckets(client *http.Client, admin string) (map[string]float64, error) {
+// verifySample is one scrape of the sigv4 verification histogram: cumulative
+// bucket counts keyed by the "le" value (+Inf included), plus the sum and
+// count series that give the mean.
+type verifySample struct {
+	buckets map[string]float64
+	sum     float64
+	count   float64
+}
+
+// buckets scrapes the sigv4 verification histogram.
+func buckets(client *http.Client, admin string) (verifySample, error) {
+	out := verifySample{buckets: map[string]float64{}}
 	resp, err := client.Get(admin + "/metrics")
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	out := map[string]float64{}
 	sc := bufio.NewScanner(resp.Body)
 	for sc.Scan() {
 		line := sc.Text()
-		if !strings.HasPrefix(line, "verification_duration_seconds_bucket") ||
+		if !strings.HasPrefix(line, "verification_duration_seconds") ||
 			!strings.Contains(line, `lane="sigv4"`) {
 			continue
 		}
-		le := line[strings.Index(line, `le="`)+4:]
-		le = le[:strings.Index(le, `"`)]
 		fields := strings.Fields(line)
 		v, err := strconv.ParseFloat(fields[len(fields)-1], 64)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
-		out[le] = v
+		switch {
+		case strings.HasPrefix(line, "verification_duration_seconds_bucket"):
+			le := line[strings.Index(line, `le="`)+4:]
+			out.buckets[le[:strings.Index(le, `"`)]] = v
+		case strings.HasPrefix(line, "verification_duration_seconds_sum"):
+			out.sum = v
+		case strings.HasPrefix(line, "verification_duration_seconds_count"):
+			out.count = v
+		}
 	}
 	return out, sc.Err()
 }
 
-// p99Bound computes the p99 upper bound from the bucket deltas between two
-// scrapes: the smallest bucket boundary whose cumulative delta covers 99 % of
-// this run's samples.
-func p99Bound(before, after map[string]float64) (bound float64, total int, ok bool) {
+// quantileBound computes a quantile's upper bound from the bucket deltas
+// between two scrapes: the smallest bucket boundary whose cumulative delta
+// covers q of this run's samples. Buckets give a bound rather than a value,
+// so a result reads "at or below this", never "exactly this".
+func quantileBound(before, after verifySample, q float64) (bound float64, total int, ok bool) {
 	type edge struct {
 		le  float64
 		cum float64
 	}
 	var edges []edge
-	for le, v := range after {
-		delta := v - before[le]
+	for le, v := range after.buckets {
+		delta := v - before.buckets[le]
 		if le == "+Inf" {
 			total = int(delta)
 			continue
@@ -201,12 +242,31 @@ func p99Bound(before, after map[string]float64) (bound float64, total int, ok bo
 		return 0, 0, false
 	}
 	sort.Slice(edges, func(i, j int) bool { return edges[i].le < edges[j].le })
-	need := 0.99 * float64(total)
+	need := q * float64(total)
 	for _, e := range edges {
 		if e.cum >= need {
 			return e.le, total, true
 		}
 	}
-	// p99 falls beyond the largest finite bucket.
+	// The quantile falls beyond the largest finite bucket.
 	return math.Inf(1), total, true
+}
+
+// meanMs is the mean verification time over the run, from the sum and count
+// deltas. Unlike the bucket bounds this is exact, which is what makes it
+// useful for telling slow work apart from a stretched tail.
+func meanMs(before, after verifySample) float64 {
+	n := after.count - before.count
+	if n <= 0 {
+		return 0
+	}
+	return (after.sum - before.sum) / n * 1000
+}
+
+// fmtBound renders a bucket bound, keeping +Inf readable.
+func fmtBound(b float64) string {
+	if math.IsInf(b, 1) {
+		return "  over 10ms"
+	}
+	return fmt.Sprintf("<= %7.3fms", b*1000)
 }
