@@ -75,6 +75,15 @@ func liveValkey(t *testing.T, opts ...ValkeyOption) *Valkey {
 	t.Helper()
 	addr := os.Getenv("OZPX_TEST_VALKEY_ADDR")
 	if addr == "" {
+		// Skipping is right on a laptop with no server running, and wrong in
+		// CI, where it turns "the shared store is exercised" into a green run
+		// that inspected nothing. The workflow provides a valkey service and
+		// sets the address; if that ever stops reaching this process, the job
+		// has to go red rather than quietly report success.
+		if os.Getenv("CI") != "" {
+			t.Fatal("OZPX_TEST_VALKEY_ADDR is unset under CI: " +
+				"the live credential-store tests would have skipped silently")
+		}
 		t.Skip("set OZPX_TEST_VALKEY_ADDR to run live valkey tests")
 	}
 	v, err := NewValkey(addr, bytes.Repeat([]byte{9}, 32), opts...)
