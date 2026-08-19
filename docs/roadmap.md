@@ -75,15 +75,6 @@ separates this list from the one below.
   be reachable from outside the sanctioned path. Verification-failure spikes,
   store errors, issuer unreachability and upstream error rates are worth
   alerting on once the rules file exists.
-- **Unit coverage on the identity-injection path.** `RewriteAccessKeyID` in
-  `internal/forward` decides which username Ozone attributes every
-  primary-data-path request to, and strips the session token from both the
-  header and the signed-headers list. It has no unit test, while its two
-  siblings do. `internal/s3err` renders every data-path rejection and has no
-  test file at all, though correct S3 error codes are what make SDK retry
-  behaviour work. Both are exercised by the acceptance suite, but this
-  project's own rule is that anything on the authentication path carries a
-  negative case.
 - **An operations runbook.** Credential revocation, identity-provider signing
   key rotation, and the response to a leaked credential. All three are
   implemented and verified; none is written down as a procedure someone could

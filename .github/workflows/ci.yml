@@ -89,6 +89,23 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    # internal/store's live tests skip themselves when OZPX_TEST_VALKEY_ADDR
+    # is unset, so without a store to talk to they skipped on every run and
+    # the shared-store code went unexercised here. One of them is the proof
+    # that deleting a credential through one client invalidates another
+    # client's cache by server push rather than by waiting out its TTL, which
+    # is what makes revocation take effect across replicas. The tag matches
+    # the compose overlay and the chart so the three move together.
+    services:
+      valkey:
+        image: valkey/valkey:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,6 +114,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Format, vet, tidy, attribution, race-enabled unit tests
+        env:
+          OZPX_TEST_VALKEY_ADDR: localhost:6379
         run: make fmt-check vet tidy-check notice-check test
 
   helm:
