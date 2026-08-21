@@ -3,20 +3,19 @@ module github.com/aimd54/ozone-oidc-proxy
 go 1.25.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.43.5
+	github.com/aws/aws-sdk-go-v2 v1.43.6
 	github.com/lestrrat-go/jwx/v2 v2.1.7
 	github.com/prometheus/client_golang v1.24.1
-	github.com/valkey-io/valkey-go v1.0.76
+	github.com/valkey-io/valkey-go v1.0.77
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/aws/smithy-go v1.27.7 // indirect
+	github.com/aws/smithy-go v1.27.8 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
