@@ -94,7 +94,7 @@
       "id": 3,
       "type": "stat",
       "title": "Active credentials",
-      "description": "Unexpired temporary credentials in the store (shared across replicas).",
+      "description": "Unexpired temporary credentials in the store (shared across replicas). Shows no data while the store cannot be read.",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [
@@ -103,7 +103,7 @@
           "editorMode": "code",
           "expr": "max(active_credentials)",
           "legendFormat": "active",
-          "range": true
+          "instant": true
         }
       ],
       "options": {
@@ -413,7 +413,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Upstream response codes",
-      "description": "Responses from the Ozone S3 Gateway by status family (2xx good, 4xx warning, 5xx critical).",
+      "description": "Responses from the Ozone S3 Gateway by status family (2xx good, 4xx warning, 5xx critical), and requests it never answered, which the proxy turned into 502s.",
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "ozpx-prometheus" },
       "targets": [
@@ -422,6 +422,13 @@
           "editorMode": "code",
           "expr": "sum by (code) (rate(upstream_requests_total[1m]))",
           "legendFormat": "{{code}}",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "editorMode": "code",
+          "expr": "sum(rate(upstream_errors_total[1m]))",
+          "legendFormat": "no response",
           "range": true
         }
       ],
@@ -474,6 +481,15 @@
           },
           {
             "matcher": { "id": "byRegexp", "options": "/^5/" },
+            "properties": [
+              {
+                "id": "color",
+                "value": { "mode": "fixed", "fixedColor": "#d03b3b" }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "no response" },
             "properties": [
               {
                 "id": "color",

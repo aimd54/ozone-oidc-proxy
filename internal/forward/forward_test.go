@@ -4,8 +4,13 @@
 package forward
 
 import (
+	"context"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"testing"
 	"time"
@@ -219,4 +224,72 @@ func TestRewriteAccessKeyIDSignedHeaderOrder(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A gateway that never answers leaves the proxy answering on its behalf.
+// Those requests are counted separately from the gateway's own responses, and
+// a client that disconnects first is not counted at all: it cancels the
+// outbound request too, which is not the gateway failing.
+func TestReverseProxyCountsUnansweredRequests(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	t.Run("a refused connection is counted, and not as a response", func(t *testing.T) {
+		// A port that was just released: nothing listens, so the dial is
+		// refused rather than left hanging.
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dead := &url.URL{Scheme: "http", Host: l.Addr().String()}
+		_ = l.Close()
+
+		var responses []int
+		unanswered := 0
+		p := NewReverseProxy(dead, logger,
+			func(status int) { responses = append(responses, status) },
+			func() { unanswered++ })
+		rec := httptest.NewRecorder()
+		p.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://proxy/bucket", nil))
+
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want 502", rec.Code)
+		}
+		if unanswered != 1 {
+			t.Errorf("unanswered = %d, want 1", unanswered)
+		}
+		// The 502 is the proxy's own. Recording it as the gateway's would
+		// blame Ozone for a request it never received.
+		if len(responses) != 0 {
+			t.Errorf("gateway responses recorded = %v, want none", responses)
+		}
+	})
+
+	t.Run("a client that left first is not counted", func(t *testing.T) {
+		// A gateway that would answer, so the cancellation is the only thing
+		// that can go wrong.
+		live := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(live.Close)
+		target, err := url.Parse(live.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		unanswered := 0
+		p := NewReverseProxy(target, logger, nil, func() { unanswered++ })
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		rec := httptest.NewRecorder()
+		p.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://proxy/bucket", nil).WithContext(ctx))
+
+		// The error path ran: without this the test would also pass if the
+		// request had simply succeeded.
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("status = %d, want 502 from the error path", rec.Code)
+		}
+		if unanswered != 0 {
+			t.Errorf("unanswered = %d, want 0: a client disconnect is not the gateway failing", unanswered)
+		}
+	})
 }

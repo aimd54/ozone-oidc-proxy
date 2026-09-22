@@ -36,15 +36,16 @@ store, so there is nothing else to invalidate.
 
 `/metrics` on the admin listener exposes Prometheus metrics: request
 counts and durations per lane, verification outcomes, upstream status
-families, active credentials, and revocations.
+families, requests the S3 Gateway never answered, whether the credential
+store is answering, active credentials, and revocations.
 
 A Grafana dashboard is committed at
 [`dashboards/ozone-oidc-proxy.json`](../dashboards/ozone-oidc-proxy.json).
 It is a plain dashboard file, importable into any Grafana rather than only
 the one the compose overlay starts. It shows traffic and
 verification-latency percentiles with p99 against a 1 ms line, the split
-between lanes, verification outcomes, upstream status families, active
-credentials, and revocations.
+between lanes, verification outcomes, upstream status families beside the
+requests the gateway never answered, active credentials, and revocations.
 
 ## Running more than one replica
 

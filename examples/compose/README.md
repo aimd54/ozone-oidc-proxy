@@ -120,8 +120,8 @@ make monitor-up   # Prometheus + Grafana at http://localhost:3000 (anonymous vie
 Grafana auto-loads the **Ozone OIDC Proxy** dashboard from
 [`dashboards/`](../../dashboards): traffic and verification-latency
 percentiles with p99 against a 1 ms line, lane split, verification outcomes,
-upstream status families, active credentials, and revocations. Drive traffic
-with `make e2e` or `make loadtest` to populate it.
+upstream status families beside unanswered requests, active credentials, and
+revocations. Drive traffic with `make e2e` or `make loadtest` to populate it.
 
 ### TLS edge
 

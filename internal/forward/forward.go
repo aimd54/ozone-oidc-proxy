@@ -10,6 +10,8 @@
 package forward
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -124,8 +126,9 @@ func StripPresignedQuery(r *http.Request) {
 }
 
 // NewReverseProxy builds the streaming reverse proxy toward the S3 Gateway.
-// onUpstreamResponse (optional) observes upstream status codes for metrics.
-func NewReverseProxy(target *url.URL, logger *slog.Logger, onUpstreamResponse func(status int)) *httputil.ReverseProxy {
+// onUpstreamResponse (optional) observes upstream status codes for metrics;
+// onUpstreamError (optional) observes requests the gateway never answered.
+func NewReverseProxy(target *url.URL, logger *slog.Logger, onUpstreamResponse func(status int), onUpstreamError func()) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
@@ -142,6 +145,11 @@ func NewReverseProxy(target *url.URL, logger *slog.Logger, onUpstreamResponse fu
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			logger.Error("upstream request failed", "error", err.Error(), "path", r.URL.Path)
+			// A client that disconnects cancels the outbound request as
+			// well. That is not the gateway failing, so it is not counted.
+			if onUpstreamError != nil && !errors.Is(err, context.Canceled) {
+				onUpstreamError()
+			}
 			s3err.Write(w, http.StatusBadGateway, s3err.CodeInternalError,
 				"upstream S3 gateway unreachable", r.URL.Path, "")
 		},

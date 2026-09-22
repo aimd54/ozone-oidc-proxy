@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -89,24 +90,38 @@ func newEnv(t *testing.T, cfgYAML string, validate func(string) (*oidc.Identity,
 	upstreamSrv := httptest.NewServer(up.handler())
 	t.Cleanup(upstreamSrv.Close)
 
-	cfg, err := config.Parse([]byte(fmt.Sprintf(cfgYAML, upstreamSrv.URL)))
-	if err != nil {
-		t.Fatalf("config: %v", err)
-	}
 	mem := store.NewMemory()
 	t.Cleanup(func() { _ = mem.Close() })
 
-	srv, err := New(cfg, stubValidator{fn: validate}, mem,
+	proxySrv, adminSrv := startServer(t, fmt.Sprintf(cfgYAML, upstreamSrv.URL), validate, mem)
+	return &testEnv{proxy: proxySrv, admin: adminSrv, upstream: up, store: mem}
+}
+
+// startServer serves both listeners of a server built from cfgYAML, whose
+// upstream is already filled in.
+func startServer(t *testing.T, cfgYAML string, validate func(string) (*oidc.Identity, error), st store.Store) (proxy, admin *httptest.Server) {
+	t.Helper()
+	cfg, err := config.Parse([]byte(cfgYAML))
+	if err != nil {
+		t.Fatalf("config: %v", err)
+	}
+	srv, err := New(cfg, stubValidator{fn: validate}, st,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		WithClock(func() time.Time { return serverNow }))
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
-	proxySrv := httptest.NewServer(srv.Handler())
-	t.Cleanup(proxySrv.Close)
-	adminSrv := httptest.NewServer(srv.AdminHandler())
-	t.Cleanup(adminSrv.Close)
-	return &testEnv{proxy: proxySrv, admin: adminSrv, upstream: up, store: mem}
+	proxy = httptest.NewServer(srv.Handler())
+	t.Cleanup(proxy.Close)
+	admin = httptest.NewServer(srv.AdminHandler())
+	t.Cleanup(admin.Close)
+	return proxy, admin
+}
+
+// scrape reads the admin listener's metrics as sample values keyed by series.
+func scrape(t *testing.T, adminURL string) map[string]string {
+	t.Helper()
+	return samples(t, bodyOf(t, mustDo(t, mustReq(t, http.MethodGet, adminURL+"/metrics"))))
 }
 
 const strictCfg = `
@@ -600,6 +615,65 @@ func TestAdminEndpoints(t *testing.T) {
 		if !strings.Contains(string(metricsBody), want) {
 			t.Errorf("metrics exposition missing %s", want)
 		}
+	}
+
+	// Series the shipped alert rules read. A rename here silences an alert
+	// without failing anything else, so the exact values are pinned.
+	got := samples(t, string(metricsBody))
+	for series, want := range map[string]string{
+		"credential_store_up":   "1",
+		"active_credentials":    "0",
+		"upstream_errors_total": "0",
+	} {
+		if got[series] != want {
+			t.Errorf("%s = %q, want %q", series, got[series], want)
+		}
+	}
+}
+
+// When the S3 Gateway does not answer, the proxy answers for it. That has to
+// be visible in the metrics, or an outage reads as a quiet period.
+func TestUnansweredUpstreamIsCounted(t *testing.T) {
+	// A port that was just released: nothing listens, so the dial is refused.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := "http://" + l.Addr().String()
+	_ = l.Close()
+
+	mem := store.NewMemory()
+	t.Cleanup(func() { _ = mem.Close() })
+	proxy, admin := startServer(t, fmt.Sprintf(strictCfg, dead), defaultValidate, mem)
+
+	req, _ := http.NewRequest(http.MethodGet, proxy.URL+"/bucket", nil)
+	req.Header.Set("Authorization", "Bearer good-token")
+	if resp := mustDo(t, req); resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502", resp.StatusCode)
+	}
+
+	got := scrape(t, admin.URL)
+	if got["upstream_errors_total"] != "1" {
+		t.Errorf("upstream_errors_total = %q, want 1", got["upstream_errors_total"])
+	}
+	for series := range got {
+		if strings.HasPrefix(series, "upstream_requests_total") {
+			t.Errorf("an unanswered request was recorded as a gateway response: %s", series)
+		}
+	}
+}
+
+// A store the proxy cannot read is reported as down, through the same
+// listener Prometheus scrapes.
+func TestMetricsReportAnUnreadableStore(t *testing.T) {
+	_, admin := startServer(t, fmt.Sprintf(strictCfg, "http://127.0.0.1:1"), defaultValidate, unreadableStore{})
+
+	got := scrape(t, admin.URL)
+	if got["credential_store_up"] != "0" {
+		t.Errorf("credential_store_up = %q, want 0", got["credential_store_up"])
+	}
+	if v, ok := got["active_credentials"]; ok {
+		t.Errorf("active_credentials = %s for a store that could not be read", v)
 	}
 }
 

@@ -450,8 +450,12 @@ audit retention, is checklisted in [production.md](production.md).
 Prometheus: `sts_exchanges_total{issuer,result}`,
 `bearer_auth_total{issuer,result}`, `sigv4_verifications_total{result}`,
 `presigned_verifications_total{result}`, `upstream_requests_total{code}`,
-`credential_revocations_total`, latency histograms (including a dedicated
-verification-overhead histogram) and an `active_credentials` gauge.
+`upstream_errors_total` for requests the gateway never answered,
+`revocations_total{result}`, and latency histograms (including a dedicated
+verification-overhead histogram). The credential store is read once per
+scrape: `credential_store_up` says whether it answered, and the
+`active_credentials` gauge is present only when it did, so a store that
+cannot be read never reports as an empty one.
 
 JSON logs: request id, username, AKID, issuer, lane, decision, **never**
 secrets, session tokens or raw JWTs.

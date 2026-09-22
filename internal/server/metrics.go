@@ -14,6 +14,11 @@ import (
 	"github.com/aimd54/ozone-oidc-proxy/internal/store"
 )
 
+// storeProbeTimeout bounds the store read made on every scrape. It stays well
+// inside any scrape timeout, so a store that has stopped answering is reported
+// as down rather than making the whole scrape fail.
+const storeProbeTimeout = 2 * time.Second
+
 // metrics implements the proxy's observability surface.
 type metrics struct {
 	registry *prometheus.Registry
@@ -23,6 +28,7 @@ type metrics struct {
 	sigv4Verifies     *prometheus.CounterVec // result
 	presignedVerifies *prometheus.CounterVec // result
 	upstream          *prometheus.CounterVec // code
+	upstreamErrors    prometheus.Counter
 	revocations       *prometheus.CounterVec // result
 	duration          *prometheus.HistogramVec
 	verifyDuration    *prometheus.HistogramVec // lane
@@ -51,6 +57,10 @@ func newMetrics(st store.Store) *metrics {
 			Name: "upstream_requests_total",
 			Help: "Responses received from the Ozone S3 Gateway by status code.",
 		}, []string{"code"}),
+		upstreamErrors: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "upstream_errors_total",
+			Help: "Requests the Ozone S3 Gateway never answered: refused, reset or timed out. A client that disconnects first is not counted.",
+		}),
 		revocations: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "revocations_total",
 			Help: "Admin credential revocations by result; a revocation is a store delete.",
@@ -67,19 +77,10 @@ func newMetrics(st store.Store) *metrics {
 			Buckets: []float64{0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01},
 		}, []string{"lane"}),
 	}
-	active := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "active_credentials",
-		Help: "Unexpired temporary credentials currently in the store.",
-	}, func() float64 {
-		n, err := st.Count(context.Background())
-		if err != nil {
-			return 0
-		}
-		return float64(n)
-	})
 	m.registry.MustRegister(
-		m.stsExchanges, m.bearerAuth, m.sigv4Verifies, m.presignedVerifies, m.upstream, m.revocations,
-		m.duration, m.verifyDuration, active,
+		m.stsExchanges, m.bearerAuth, m.sigv4Verifies, m.presignedVerifies, m.upstream, m.upstreamErrors,
+		m.revocations, m.duration, m.verifyDuration,
+		newStoreCollector(st, storeProbeTimeout),
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
@@ -88,6 +89,10 @@ func newMetrics(st store.Store) *metrics {
 
 func (m *metrics) observeUpstream(status int) {
 	m.upstream.WithLabelValues(strconv.Itoa(status)).Inc()
+}
+
+func (m *metrics) observeUpstreamError() {
+	m.upstreamErrors.Inc()
 }
 
 func (m *metrics) observeDuration(lane string, start time.Time) {
@@ -106,4 +111,42 @@ func resultLabel(code string) string {
 		return "success"
 	}
 	return code
+}
+
+// storeCollector reads the credential store once per scrape. It reports
+// whether the store answered, and the number of live credentials only when it
+// did: a store that cannot be read is not a store with nothing in it.
+type storeCollector struct {
+	store   store.Store
+	timeout time.Duration
+	up      *prometheus.Desc
+	active  *prometheus.Desc
+}
+
+func newStoreCollector(st store.Store, timeout time.Duration) *storeCollector {
+	return &storeCollector{
+		store:   st,
+		timeout: timeout,
+		up: prometheus.NewDesc("credential_store_up",
+			"Whether the credential store answered at the last scrape.", nil, nil),
+		active: prometheus.NewDesc("active_credentials",
+			"Unexpired temporary credentials currently in the store; absent while the store cannot be read.", nil, nil),
+	}
+}
+
+func (c *storeCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.up
+	ch <- c.active
+}
+
+func (c *storeCollector) Collect(ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+	n, err := c.store.Count(ctx)
+	if err != nil {
+		ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 0)
+		return
+	}
+	ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 1)
+	ch <- prometheus.MustNewConstMetric(c.active, prometheus.GaugeValue, float64(n))
 }

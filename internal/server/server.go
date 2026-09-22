@@ -81,7 +81,7 @@ func New(cfg *config.Config, validator sts.TokenValidator, st store.Store, logge
 			s.metrics.stsExchanges.WithLabelValues(orUnknown(r.Issuer), resultLabel(r.Code)).Inc()
 		},
 	}
-	s.proxy = forward.NewReverseProxy(target, logger, s.metrics.observeUpstream)
+	s.proxy = forward.NewReverseProxy(target, logger, s.metrics.observeUpstream, s.metrics.observeUpstreamError)
 	s.upstreamHost = target.Host
 	return s, nil
 }
