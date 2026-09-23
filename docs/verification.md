@@ -448,18 +448,116 @@ plain HTTP is denied by that policy, and every token exchange returns
 pod selector and `issuerEgressPorts` to its port fixes it, and is tighter than
 the default.
 
+## Alert rules and the boundary probes (2026-09-22, suite runs 2026-09-23)
+
+The rules in `alerts/`, the two metrics added for them, and the lab's checks
+on anonymous access, exercised against the compose stack. Ozone and Keycloak
+are the images of the stack under test. The proxy was built from this tree
+with `make docker-build` (Go 1.26, `CGO_ENABLED=0`, `-trimpath`, `-s -w`) on
+linux/amd64 with Docker 29.8.1.
+
+| Component | Version |
+| --- | --- |
+| Prometheus | `prom/prometheus@sha256:6559acbd5d77...` (tag v3.1.0), the monitor overlay |
+| blackbox_exporter | `prom/blackbox-exporter@sha256:e753ff9f3fc4...` (tag v0.28.0) |
+| HAProxy | 3.4.4, `haproxy@sha256:52c5921e1619...` (tag lts-alpine), the edge overlay |
+| valkey | `valkey/valkey@sha256:2e5a314659c8...` (tag 8), the HA overlay |
+
+### The rules against a running proxy
+
+The monitor overlay's Prometheus loaded the ten rules of
+`ozone-oidc-proxy.rules.yml`, each reporting `health: ok` with no evaluation
+error. Replicas are found by name: with the base stack alone the only target
+was `proxy:9090`; the HA overlay's `proxy-b:9090` joined within one refresh;
+and once it was removed its `up` series went stale instead of reading 0, so a
+replica that is not running never reads as one that is down.
+
+- **The S3 Gateway stopped.** An authenticated request every five seconds for
+  eight minutes: 72 were answered 502 by the proxy, each counted in
+  `upstream_errors_total` and none recorded in `upstream_requests_total`.
+  `OzoneOIDCProxyUpstreamUnreachable` went pending with the first scrape and
+  fired five minutes later, and Grafana listed it firing to its anonymous
+  viewer, beside a positive rate on the dashboard's new "no response" series.
+  With the gateway back, the answers became Ozone's own again, and the alert
+  resolved once the errors left its five-minute window.
+- **valkey paused.** Paused rather than stopped, so that connections are
+  accepted and never answered, which is the case the store read's bound
+  exists for. Both replicas reported `credential_store_up 0` with
+  `active_credentials` absent, their scrapes took 2.00 s with `up` still 1,
+  and `OzoneOIDCProxyCredentialStoreDown` fired on each two minutes after
+  going pending. A proxy built from `d7b6155`, the commit before these
+  metrics, scraped against the same paused store with the lab's five-second
+  timeout, returned nothing and timed out at 5.04 s: Prometheus would have
+  recorded the proxy itself as down.
+
+### The probes
+
+Run from the host, which is outside the path the lab allows to the gateway,
+`ozpx_anonymous_refused` against the proxy succeeded (403, body matched), and
+`ozpx_tcp_connect` against the gateway's port failed with its name resolved
+(`probe_ip_protocol 4`): the boundary held from there.
+
+Run inside the compose network, `ozpx_tcp_connect` reached the gateway
+(`probe_success 1`). That is the bypass alert's condition, and the reason the
+lab does not load the probe rules. With the gateway container stopped, the
+same probe failed with `probe_ip_protocol 0`: the name no longer resolved,
+and a probe in that state reads exactly like a boundary holding.
+`OzoneOIDCProxyBypassProbeUnresolved` exists for it.
+
+### With strict mode off
+
+The proxy restarted on a copy of the lab configuration with
+`data_path.strict: false`.
+
+- Ozone refused the anonymous request itself, with a **403**
+  `InvalidRequest` ("Error creating s3 auth info"). Its refusal of an
+  authenticated user without the right is a 403 too, `AccessDenied`. The
+  probe's unit test holds it against both bodies.
+- **Two existing checks passed against this proxy**: the acceptance suite's
+  strict-mode check, which compared the status only, and the TLS edge's
+  healthcheck, whose HAProxy routed to any backend that accepted a
+  connection. Both now require the proxy's own message. Against the same
+  proxy the suite's check failed, the probe failed
+  (`probe_failed_due_to_regex 1`), and the edge marked its backend down
+  ("HTTP content check did not match") and answered 503, failing its
+  healthcheck.
+- Back in strict mode, the edge marked the backend up on its next check and
+  the healthcheck passed.
+
+### The acceptance suite
+
+Run on the same build with the edge overlay, without it, and with the HA
+overlay: 75, 71 and 80 checks, two more than before in each, for
+`credential_store_up` and `upstream_errors_total` being exposed. Every check
+passed except the three that script the device-flow sign-in, in all three
+runs.
+
+### Finding: the scripted device-flow sign-in fails on curl 8.22
+
+The suite drives Keycloak's browser pages with curl and a cookie jar. curl
+8.22.0 accepts Keycloak's session cookies for the single-label host
+`keycloak` when they arrive, then refuses to load them back from the jar
+("cookie dropped, domain '[file]' must not set cookies for 'keycloak'"), so
+the login posts without a session and Keycloak answers "Cookie not found".
+curl 8.21.0 loads them. The same steps run with curl 8.21.0 on the compose
+network passed all three, the exchange at the proxy's STS included. The
+proxy is not involved: the first two checks never reach it, and the third
+fails only because it is handed an empty token. The fix belongs in the
+suite's cookie handling and has not been made.
+
 ## Reproduce
 
 ```bash
 make demo                            # up + init + one real S3 round-trip
-make up && make init && make e2e     # base suite (69/69)
-make edge-up && make e2e             # + TLS edge via HAProxy (73/73)
+make up && make init && make e2e     # base suite (71 checks)
+make edge-up && make e2e             # + TLS edge via HAProxy (75)
 make lakehouse-up && make lakehouse-smoke   # Nessie/Iceberg overlay (4/4)
 docker exec oidc-jupyter jupyter nbconvert --to notebook --execute \
   ozone-oidc-tour.ipynb --output /tmp/executed.ipynb   # the full tour
-make ha-up && make e2e               # + HA/valkey/resign/revocation (78/78)
+make ha-up && make e2e               # + HA/valkey/resign/revocation (80)
 make loadtest                        # p99 gate (fails if verification p99 ≥ 1 ms)
-make monitor-up                      # Prometheus + Grafana → http://localhost:3000
+make monitor-up                      # Prometheus + Grafana → http://localhost:3000, rules loaded
+make alerts-check                    # promtool tests for the rules, probe module check
 ./charts/smoke.sh               # Helm chart on a throwaway kind cluster (8/8)
 bash examples/kubernetes/up.sh       # Ozone from its official chart + the proxy, on kind
 make clean                           # tear down + delete volumes
