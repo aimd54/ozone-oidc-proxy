@@ -25,9 +25,11 @@ services:
     depends_on:
       - proxy
     healthcheck:
-      # Healthy = TLS handshake succeeds AND the strict proxy answers the
-      # anonymous probe with 403 (the production.md boundary check): proves
-      # edge TLS, routing to the backend, and that strict mode is alive.
+      # Healthy = TLS handshake succeeds AND the anonymous probe gets a 403
+      # (the production.md boundary check). HAProxy only routes to a proxy
+      # whose own check sees the proxy's refusal message (haproxy.cfg), so a
+      # 403 here proves edge TLS, routing to the backend, and that strict
+      # mode is alive; with strict mode off the edge answers 503.
       # 127.0.0.1, not localhost: the container resolves localhost to ::1
       # first and the frontend binds IPv4.
       test: ["CMD-SHELL", "wget --no-check-certificate -O /dev/null https://127.0.0.1:8443/ 2>&1 | grep -q 403"]

@@ -531,9 +531,10 @@ if docker ps --format '{{.Names}}' | grep -q '^oidc-haproxy$'; then
     [ "$EDGE_GET" = "hello from the oidc proxy" ] \
         && ok "anonymous https fetch of the presigned URL round-trips" \
         || ko "anonymous https fetch of the presigned URL round-trips" "got: $EDGE_GET"
-    EDGE_ANON=$(curl_net -k -o /dev/null -w '%{http_code}' "$EDGE_EP/$BUCKET/hello.txt")
-    [ "$EDGE_ANON" = "403" ] && ok "strict 403 preserved through the edge" \
-        || ko "strict 403 preserved through the edge" "http $EDGE_ANON"
+    EDGE_ANON=$(curl_net -k -w '\n%{http_code}' "$EDGE_EP/$BUCKET/hello.txt")
+    [ "${EDGE_ANON##*$'\n'}" = "403" ] && grep -q "authentication required" <<<"$EDGE_ANON" \
+        && ok "the proxy's own 403 preserved through the edge" \
+        || ko "the proxy's own 403 preserved through the edge" "$EDGE_ANON"
 else
     echo "  SKIP TLS edge checks (overlay not running, make edge-up)"
 fi
@@ -541,9 +542,12 @@ fi
 step "Strict mode (no anonymous fallback)"
 expect_fail_with "plain SigV4 with AWS_ACCESS_KEY_ID=alice → InvalidAccessKeyId" "InvalidAccessKeyId" \
     aws_as alice x "" s3 ls "s3://$BUCKET"
-ANON=$(curl -s -o /dev/null -w '%{http_code}' "$PROXY_URL/$BUCKET/hello.txt")
-[ "$ANON" = "403" ] && ok "anonymous request rejected with 403" \
-    || ko "anonymous request rejected with 403" "http $ANON"
+# The proxy's own refusal, not merely a 403: with strict mode off the request
+# reaches Ozone, which refuses it with a 403 of its own.
+ANON=$(curl -s -w '\n%{http_code}' "$PROXY_URL/$BUCKET/hello.txt")
+[ "${ANON##*$'\n'}" = "403" ] && grep -q "authentication required" <<<"$ANON" \
+    && ok "anonymous request refused by the proxy itself" \
+    || ko "anonymous request refused by the proxy itself" "$ANON"
 if curl -s --max-time 3 http://localhost:9878/ >/dev/null 2>&1; then
     ko "S3 Gateway must not be reachable from the host"
 else
@@ -553,7 +557,8 @@ fi
 step "Admin surface"
 curl -sf "$ADMIN_URL/healthz" >/dev/null && ok "/healthz" || ko "/healthz"
 METRICS=$(curl -sf "$ADMIN_URL/metrics")
-for metric in sts_exchanges_total bearer_auth_total sigv4_verifications_total presigned_verifications_total active_credentials; do
+for metric in sts_exchanges_total bearer_auth_total sigv4_verifications_total presigned_verifications_total \
+    active_credentials credential_store_up upstream_errors_total; do
     grep -q "$metric" <<<"$METRICS" && ok "metric $metric exposed" || ko "metric $metric exposed"
 done
 

@@ -136,9 +136,10 @@ make edge-up   # HAProxy terminating TLS at https://localhost:8443 (self-signed)
 ```
 
 Models the production ingress: HAProxy terminates TLS and forwards to the
-proxy with the SigV4-signed Host header untouched. Its healthcheck is the
-anonymous-probe boundary check, which expects the strict 403. With the
-overlay up, `make e2e` adds a TLS section.
+proxy with the SigV4-signed Host header untouched. HAProxy routes only to a
+proxy that refuses an anonymous request with its own message, so if strict
+mode were ever turned off the edge would answer 503 and its healthcheck
+would fail. With the overlay up, `make e2e` adds a TLS section.
 
 ### Lakehouse: Nessie and Iceberg
 
