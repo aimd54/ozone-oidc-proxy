@@ -1,0 +1,146 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Unit tests for ozone-oidc-proxy-probes.rules.yml: `make alerts-check`. The
+# probe_ip_protocol values are what blackbox_exporter reports: 4 or 6 once
+# the target has resolved, 0 when it has not.
+rule_files:
+  - ozone-oidc-proxy-probes.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: both boundaries holding
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-anonymous", instance="https://s3.example.com/"}'
+        values: '1x30'
+      - series: 'probe_success{job="ozone-oidc-proxy-bypass", instance="s3g.ozone.svc:9878"}'
+        values: '0x30'
+      - series: 'probe_ip_protocol{job="ozone-oidc-proxy-bypass", instance="s3g.ozone.svc:9878"}'
+        values: '4x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyAcceptsAnonymousRequests
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: OzoneS3GatewayReachableBypassingProxy
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyProbeNotReporting
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyBypassProbeUnresolved
+        exp_alerts: []
+
+  - name: the proxy stops refusing anonymous requests
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-anonymous", instance="https://s3.example.com/"}'
+        values: '1 1 1 0x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: OzoneOIDCProxyAcceptsAnonymousRequests
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OzoneOIDCProxyAcceptsAnonymousRequests
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: ozone-oidc-proxy-anonymous
+              instance: https://s3.example.com/
+            exp_annotations:
+              summary: https://s3.example.com/ did not refuse an anonymous request.
+              description: >-
+                An unauthenticated request did not get the proxy's own 403.
+                Either the proxy cannot be reached from the probe, or it is
+                passing anonymous requests to Ozone: check that
+                data_path.strict has not been turned off.
+
+  # A rolling restart drops a probe or two. That is not the boundary opening.
+  - name: a proxy restart is not an anonymous-access alarm
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-anonymous", instance="https://s3.example.com/"}'
+        values: '1 1 1 0 1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OzoneOIDCProxyAcceptsAnonymousRequests
+        exp_alerts: []
+
+  - name: the S3 Gateway accepts a connection from outside the proxy
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-bypass", instance="s3g.ozone.svc:9878"}'
+        values: '0 0 0 1x10'
+      - series: 'probe_ip_protocol{job="ozone-oidc-proxy-bypass", instance="s3g.ozone.svc:9878"}'
+        values: '4x13'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OzoneS3GatewayReachableBypassingProxy
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: OzoneS3GatewayReachableBypassingProxy
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: ozone-oidc-proxy-bypass
+              instance: s3g.ozone.svc:9878
+            exp_annotations:
+              summary: The S3 Gateway at s3g.ozone.svc:9878 accepts connections that bypass the proxy.
+              description: >-
+                The gateway authenticates nobody, so anything that can connect
+                to it can act as any user. The network policy confining it to
+                the proxy is missing, not enforced, or has been widened.
+
+  # The anonymous probe is configured and the bypass one was never added, or
+  # was removed: the half that remains keeps reporting healthy.
+  - name: a probe that is not reporting
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-anonymous", instance="https://s3.example.com/"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: OzoneOIDCProxyProbeNotReporting
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyProbeNotReporting
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: ozone-oidc-proxy-bypass
+            exp_annotations:
+              summary: The ozone-oidc-proxy-bypass probe is not reporting.
+              description: >-
+                Prometheus has no result for this probe, so the boundary it
+                watches is not being checked. Check the blackbox exporter and
+                the scrape job.
+
+  # A failed lookup reads as probe_success 0, exactly like a refusal, so the
+  # bypass alert stays quiet. Only the resolution guard can say so.
+  - name: a bypass probe whose target does not resolve
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="ozone-oidc-proxy-bypass", instance="s3g.wrong-namespace.svc:9878"}'
+        values: '0x30'
+      - series: 'probe_ip_protocol{job="ozone-oidc-proxy-bypass", instance="s3g.wrong-namespace.svc:9878"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneS3GatewayReachableBypassingProxy
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyBypassProbeUnresolved
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: ozone-oidc-proxy-bypass
+              instance: s3g.wrong-namespace.svc:9878
+            exp_annotations:
+              summary: The bypass probe cannot resolve s3g.wrong-namespace.svc:9878.
+              description: >-
+                A connection that fails because the name does not resolve
+                looks the same as one the gateway refused, so this probe is
+                passing without testing anything. Give it the name clients of
+                the gateway would use.

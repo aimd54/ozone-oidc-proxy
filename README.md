@@ -144,7 +144,7 @@ the design targets it specifically:
 | [Install](docs/install.md) | Cluster prerequisites, the identity provider checklist, and Helm |
 | [Clients](docs/clients.md) | aws, boto3, mc, s3a, bearer tokens, presigned URLs |
 | [Configuration](docs/configuration.md) | Every key, with its default |
-| [Operations](docs/operations.md) | Revocation, metrics, running replicas |
+| [Operations](docs/operations.md) | Revocation, metrics and alerts, running replicas |
 | [Architecture](docs/architecture.md) | How the pieces fit, and what is trusted where |
 
 [docs/README.md](docs/README.md) is the full index, adding the production

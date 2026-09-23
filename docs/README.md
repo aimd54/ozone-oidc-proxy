@@ -6,7 +6,7 @@
 | [install.md](install.md) | Cluster prerequisites, the identity provider checklist, minimal config, and Helm |
 | [configuration.md](configuration.md) | Every configuration key, with its default |
 | [clients.md](clients.md) | Pointing aws, boto3, mc, s3a, curl and presigned URLs at the proxy |
-| [operations.md](operations.md) | Revocation, the admin listener, metrics, and running replicas |
+| [operations.md](operations.md) | Revocation, the admin listener, metrics and alerts, and running replicas |
 | [production.md](production.md) | The production checklist, what has to be protected, and the Ranger note |
 | [verification.md](verification.md) | What has been exercised against a running cluster, with dates and image digests |
 | [upstream.md](upstream.md) | The upstream Ozone OIDC and STS work, and what would make this project unnecessary |

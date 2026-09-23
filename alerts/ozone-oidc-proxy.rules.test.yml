@@ -1,0 +1,436 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Unit tests for ozone-oidc-proxy.rules.yml: `make alerts-check`. Each alert
+# is shown firing on the condition it names and staying quiet on the nearest
+# condition that must not page, because a rule that fires on everything
+# passes a test that only checks the positive case.
+rule_files:
+  - ozone-oidc-proxy.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: nothing is scraped under the job the rules select
+    interval: 1m
+    input_series:
+      - series: 'up{job="prometheus", instance="localhost:9090"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: OzoneOIDCProxyNotScraped
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyNotScraped
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: ozone-oidc-proxy
+            exp_annotations:
+              summary: No ozone-oidc-proxy target is being scraped.
+              description: >-
+                Prometheus has no target in job ozone-oidc-proxy, so none of
+                the proxy's other alerts can fire. Check the scrape
+                configuration, and the job name these rules select.
+
+  - name: a scraped proxy is not reported missing
+    interval: 1m
+    input_series:
+      - series: 'up{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyNotScraped
+        exp_alerts: []
+
+  - name: a replica that stops answering scrapes
+    interval: 1m
+    input_series:
+      - series: 'up{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '1 1 1 0x10'
+      # Another job going down is not this proxy's problem.
+      - series: 'up{job="other", instance="other:8080"}'
+        values: '0x13'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: OzoneOIDCProxyDown
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: OzoneOIDCProxyDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: ozone-oidc-proxy
+              instance: proxy-0:9090
+            exp_annotations:
+              summary: Proxy proxy-0:9090 is not answering scrapes.
+              description: >-
+                The admin listener of proxy-0:9090 has not answered for two
+                minutes. Clients sent to this replica are failing, and nothing
+                it would report is being seen.
+
+  - name: one missed scrape is not an outage
+    interval: 1m
+    input_series:
+      - series: 'up{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '1 1 1 0 1x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: OzoneOIDCProxyDown
+        exp_alerts: []
+
+  - name: a credential store the proxy cannot read
+    interval: 1m
+    input_series:
+      - series: 'credential_store_up{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '1 1 0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OzoneOIDCProxyCredentialStoreDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OzoneOIDCProxyCredentialStoreDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: ozone-oidc-proxy
+              instance: proxy-0:9090
+            exp_annotations:
+              summary: Proxy proxy-0:9090 cannot read its credential store.
+              description: >-
+                Token exchanges and SigV4 requests fail on proxy-0:9090 while
+                the store cannot be read; bearer requests do not use it. Check
+                that valkey is running and reachable from the proxy.
+
+  - name: a store that serves reads but rejects writes
+    interval: 1m
+    input_series:
+      - series: 'credential_store_up{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '1x30'
+      - series: 'sts_exchanges_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="keycloak", result="ServiceFailure"}'
+        values: '0+2x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyCredentialStoreDown
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyCredentialStoreErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+            exp_annotations: &storeErrors
+              summary: Requests on proxy-0:9090 are failing on credential store errors.
+              description: >-
+                The store answers the proxy's scrape but fails requests: token
+                exchanges cannot save credentials, or verifications cannot
+                read them. A valkey that is out of memory rejects writes while
+                still serving reads.
+
+  # The lanes' counters share their labels once rate() drops the metric name.
+  # Without the lane label, the idle SigV4 series would displace the failing
+  # presigned one and this would stay silent.
+  - name: store errors on one lane are not hidden by another lane's quiet series
+    interval: 1m
+    input_series:
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="store_error"}'
+        values: '3x30'
+      - series: 'presigned_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="store_error"}'
+        values: '0+2x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyCredentialStoreErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+            exp_annotations: *storeErrors
+
+  - name: token exchanges that cannot reach the issuer
+    interval: 1m
+    input_series:
+      - series: 'sts_exchanges_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="IDPCommunicationError"}'
+        values: '0+4x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: OzoneOIDCProxyIssuerUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: proxy-0:9090
+            exp_annotations: &issuerUnreachable
+              summary: Proxy proxy-0:9090 cannot reach an identity provider.
+              description: >-
+                Tokens cannot be verified because an issuer's discovery
+                document or signing keys cannot be fetched. No new credentials
+                are being issued; credentials already issued keep working
+                until they expire. Check the issuer, and that the egress policy
+                admits it.
+      # An unreachable issuer is its own alert, not a share of rejections.
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyTokenExchangesRejected
+        exp_alerts: []
+
+  - name: bearer requests that cannot reach the issuer
+    interval: 1m
+    input_series:
+      - series: 'bearer_auth_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="ServiceUnavailable"}'
+        values: '0+4x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: OzoneOIDCProxyIssuerUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: proxy-0:9090
+            exp_annotations: *issuerUnreachable
+
+  - name: one issuer failure is not an outage
+    interval: 1m
+    input_series:
+      - series: 'sts_exchanges_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="IDPCommunicationError"}'
+        values: '0 0 0 1x20'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OzoneOIDCProxyIssuerUnreachable
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: OzoneOIDCProxyIssuerUnreachable
+        exp_alerts: []
+
+  - name: most token exchanges rejected
+    interval: 1m
+    input_series:
+      - series: 'sts_exchanges_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="keycloak", result="success"}'
+        values: '0+1x30'
+      - series: 'sts_exchanges_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="InvalidIdentityToken"}'
+        values: '0+3x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: OzoneOIDCProxyTokenExchangesRejected
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyTokenExchangesRejected
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+              result: InvalidIdentityToken
+            exp_annotations:
+              summary: 75% of token exchanges on proxy-0:9090 are rejected with InvalidIdentityToken.
+              description: >-
+                InvalidIdentityToken usually means an audience or issuer that
+                no longer matches after a change at the identity provider;
+                ExpiredTokenException, clients presenting stale tokens or a
+                clock problem; AccessDenied, a role ARN outside the allowlist.
+
+  - name: signature mismatches on the SigV4 lane
+    interval: 1m
+    input_series:
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="success"}'
+        values: '0+10x30'
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="mismatch"}'
+        values: '0+5x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyRequestsRejected
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+              lane: sigv4
+              result: mismatch
+            exp_annotations:
+              summary: 33.33% of sigv4 requests on proxy-0:9090 are rejected as mismatch.
+              description: &rejectedDescription >-
+                skew means a clock problem, on the clients or on the proxy's
+                host; mismatch, usually a Host header rewritten between the
+                client and the proxy, or a client holding the wrong secret;
+                unknown_akid, credentials lost with the memory store on a
+                restart, or a revoked credential still in use; AccessDenied on
+                the bearer lane, tokens that no longer match an issuer's
+                audience.
+
+  # Same lane collision as for store errors: a quiet SigV4 mismatch series
+  # must not hide presigned URLs failing.
+  - name: presigned mismatches are not hidden by a quiet SigV4 series
+    interval: 1m
+    input_series:
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="success"}'
+        values: '0+10x30'
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="mismatch"}'
+        values: '2x30'
+      - series: 'presigned_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="success"}'
+        values: '0+1x30'
+      - series: 'presigned_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="mismatch"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyRequestsRejected
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+              lane: presigned
+              result: mismatch
+            exp_annotations:
+              summary: 50% of presigned requests on proxy-0:9090 are rejected as mismatch.
+              description: *rejectedDescription
+
+  - name: bearer tokens rejected
+    interval: 1m
+    input_series:
+      - series: 'bearer_auth_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="keycloak", result="success"}'
+        values: '0+1x30'
+      - series: 'bearer_auth_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="AccessDenied"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyRequestsRejected
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+              lane: bearer
+              result: AccessDenied
+            exp_annotations:
+              summary: 50% of bearer requests on proxy-0:9090 are rejected as AccessDenied.
+              description: *rejectedDescription
+
+  # Expiry is how temporary credentials and presigned URLs are meant to end,
+  # and a client told so refreshes. None of it is worth a page.
+  - name: expiry on every lane is routine
+    interval: 1m
+    input_series:
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="success"}'
+        values: '0+1x30'
+      - series: 'sigv4_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="expired"}'
+        values: '0+9x30'
+      - series: 'presigned_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="success"}'
+        values: '0+1x30'
+      - series: 'presigned_verifications_total{job="ozone-oidc-proxy", instance="proxy-0:9090", result="url_expired"}'
+        values: '0+9x30'
+      - series: 'bearer_auth_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="keycloak", result="success"}'
+        values: '0+1x30'
+      - series: 'bearer_auth_total{job="ozone-oidc-proxy", instance="proxy-0:9090", issuer="unknown", result="ExpiredToken"}'
+        values: '0+9x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyRequestsRejected
+        exp_alerts: []
+
+  - name: the S3 Gateway stops answering
+    interval: 1m
+    input_series:
+      - series: 'upstream_errors_total{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '0+3x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: OzoneOIDCProxyUpstreamUnreachable
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: OzoneOIDCProxyUpstreamUnreachable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: proxy-0:9090
+            exp_annotations:
+              summary: The S3 Gateway is not answering proxy proxy-0:9090.
+              description: >-
+                Requests are reaching the proxy, passing authentication, and
+                getting no response from the S3 Gateway, so the proxy answers
+                them with 502. Check the gateway, and that the proxy's egress
+                policy still admits it.
+
+  - name: one unanswered request is not an outage
+    interval: 1m
+    input_series:
+      - series: 'upstream_errors_total{job="ozone-oidc-proxy", instance="proxy-0:9090"}'
+        values: '0 0 0 1x20'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OzoneOIDCProxyUpstreamUnreachable
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: OzoneOIDCProxyUpstreamUnreachable
+        exp_alerts: []
+
+  - name: the S3 Gateway answering with server errors
+    interval: 1m
+    input_series:
+      - series: 'upstream_requests_total{job="ozone-oidc-proxy", instance="proxy-0:9090", code="200"}'
+        values: '0+10x30'
+      - series: 'upstream_requests_total{job="ozone-oidc-proxy", instance="proxy-0:9090", code="503"}'
+        values: '0+2x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyUpstreamErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+            exp_annotations:
+              summary: 16.67% of S3 Gateway responses to proxy-0:9090 are server errors.
+              description: >-
+                These are Ozone's own answers, not the proxy's: the gateway is
+                up but failing requests. Look at the Ozone Manager and the
+                Datanodes behind it.
+
+  # Ozone's refusals are ACL decisions, not failures.
+  - name: client errors from the gateway are not server errors
+    interval: 1m
+    input_series:
+      - series: 'upstream_requests_total{job="ozone-oidc-proxy", instance="proxy-0:9090", code="200"}'
+        values: '0+1x30'
+      - series: 'upstream_requests_total{job="ozone-oidc-proxy", instance="proxy-0:9090", code="403"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OzoneOIDCProxyUpstreamErrors
+        exp_alerts: []
+
+  # p99 lands in the (1 ms, 2.5 ms] bucket: 95 of 100 verifications per
+  # minute finish within 1 ms, the other five within 2.5 ms.
+  - name: verification slower than its target
+    interval: 1m
+    input_series:
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="0.0005"}'
+        values: '0+90x30'
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="0.001"}'
+        values: '0+95x30'
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="0.0025"}'
+        values: '0+100x30'
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="+Inf"}'
+        values: '0+100x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: OzoneOIDCProxyVerificationSlow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyVerificationSlow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              instance: proxy-0:9090
+              lane: sigv4
+            exp_annotations:
+              summary: sigv4 verification p99 on proxy-0:9090 is 2.2ms.
+              description: >-
+                Signature verification is meant to stay under 1 ms at the 99th
+                percentile. This is the proxy's own overhead, separate from
+                time spent in Ozone: look for CPU starvation, or a slow
+                credential store.
+
+  - name: verification within its target
+    interval: 1m
+    input_series:
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="0.0005"}'
+        values: '0+100x30'
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="0.001"}'
+        values: '0+100x30'
+      - series: 'verification_duration_seconds_bucket{job="ozone-oidc-proxy", instance="proxy-0:9090", lane="sigv4", le="+Inf"}'
+        values: '0+100x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: OzoneOIDCProxyVerificationSlow
+        exp_alerts: []

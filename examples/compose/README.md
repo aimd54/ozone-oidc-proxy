@@ -123,6 +123,12 @@ percentiles with p99 against a 1 ms line, lane split, verification outcomes,
 upstream status families beside unanswered requests, active credentials, and
 revocations. Drive traffic with `make e2e` or `make loadtest` to populate it.
 
+Prometheus also evaluates the alert rules in [`alerts/`](../../alerts)
+against the proxy. There is no Alertmanager in the lab; Grafana lists the
+rules and their state under **Alerting**, **Alert rules**. The probe rules
+are not loaded here: the lab's single network lets anything reach the S3
+Gateway, so the bypass probe would report exactly that.
+
 ### TLS edge
 
 ```bash

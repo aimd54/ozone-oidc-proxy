@@ -30,6 +30,12 @@ next, and what has deliberately not been built.
   local work, and a Prometheus and Grafana overlay. A worked Kubernetes
   example runs Ozone from its own official chart with the proxy in front of
   it, so the deployment path is exercised rather than described.
+- **Alerting.** Prometheus rules on the proxy's own metrics, and blackbox
+  probes for the two boundaries that fail silently open: an anonymous
+  request must be refused by the proxy, and the S3 Gateway must not be
+  reachable except through it. Every rule is unit-tested with promtool in
+  CI, firing on the condition it names and quiet on the nearest one that
+  must not page.
 - **Signed releases.** Binaries for linux and darwin on amd64 and arm64, each
   archive carrying an SBOM, with the checksums signed keylessly and build
   provenance attested. A distroless container image is published alongside.
@@ -68,13 +74,6 @@ separates this list from the one below.
   the chart, which ships no edge, but it would have to decide whether to trust
   a forwarded client address, and that is a security decision in its own
   right. The 1 MiB body cap is not a rate limit.
-- **Alert rules, and a probe that fails loudly.** The metrics and the Grafana
-  dashboard exist; nothing acts on them. Two checks matter more than the rest,
-  because both fail silently open if a policy is edited carelessly: an
-  anonymous request to the proxy must be refused, and the S3 Gateway must not
-  be reachable from outside the sanctioned path. Verification-failure spikes,
-  store errors, issuer unreachability and upstream error rates are worth
-  alerting on once the rules file exists.
 - **An operations runbook.** Credential revocation, identity-provider signing
   key rotation, and the response to a leaked credential. All three are
   implemented and verified; none is written down as a procedure someone could

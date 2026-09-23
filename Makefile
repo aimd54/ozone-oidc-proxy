@@ -1,7 +1,7 @@
 # Copyright The ozone-oidc-proxy Authors
 # SPDX-License-Identifier: Apache-2.0
 
-.PHONY: help build test vet fmt-check lint tidy-check notice notice-check lint-docs check docker-build up init init-stack demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
+.PHONY: help build test vet fmt-check lint tidy-check notice notice-check lint-docs alerts-check check docker-build up init init-stack demo e2e loadtest portal-up portal-down check-hosts ha-up ha-down monitor-up monitor-down edge-up edge-down lakehouse-up lakehouse-down lakehouse-smoke down clean logs logs-proxy
 
 BINARY  = bin/ozone-oidc-proxy
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -27,6 +27,7 @@ help:
 	@echo "  make notice        - Regenerate NOTICE from the linked module graph"
 	@echo "  make notice-check  - Fail if NOTICE no longer matches that graph"
 	@echo "  make lint-docs     - Lint markdown (requires Node)"
+	@echo "  make alerts-check  - Check the alert rules and probe modules, and run their tests (Docker)"
 	@echo "  make check         - All local gates (run before every commit)"
 	@echo "  make docker-build  - Build the proxy container image ($(IMAGE))"
 	@echo ""
@@ -87,6 +88,21 @@ notice-check:
 
 lint-docs:
 	npx --yes markdownlint-cli2 "**/*.md"
+
+# Alert rules and probe modules under alerts/. promtool comes from the same
+# Prometheus image the monitor overlay runs, so the rules are tested by the
+# version that loads them, and the probe modules are checked by the exporter
+# that reads them. Set PROMTOOL=promtool or BLACKBOX_EXPORTER=blackbox_exporter
+# to use local binaries instead.
+PROMETHEUS_IMAGE  ?= prom/prometheus:v3.1.0
+BLACKBOX_IMAGE    ?= prom/blackbox-exporter:v0.28.0
+PROMTOOL          ?= docker run --rm -v "$(CURDIR)/alerts":/alerts:ro -w /alerts --entrypoint promtool $(PROMETHEUS_IMAGE)
+BLACKBOX_EXPORTER ?= docker run --rm -v "$(CURDIR)/alerts":/alerts:ro -w /alerts $(BLACKBOX_IMAGE)
+
+alerts-check:
+	cd alerts && $(PROMTOOL) check rules ozone-oidc-proxy.rules.yml ozone-oidc-proxy-probes.rules.yml
+	cd alerts && $(PROMTOOL) test rules ozone-oidc-proxy.rules.test.yml ozone-oidc-proxy-probes.rules.test.yml
+	cd alerts && $(BLACKBOX_EXPORTER) --config.file=blackbox.yml --config.check
 
 # All local gates; run before every commit. CI runs the same set.
 check: fmt-check vet lint tidy-check notice-check test

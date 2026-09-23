@@ -1,0 +1,195 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Alerting rules on the metrics the proxy's admin listener exports. Load the
+# file through rule_files, or place its groups under the spec of a
+# PrometheusRule for the Prometheus Operator. The tests beside it run with
+# `make alerts-check`.
+#
+# Every expression selects job="ozone-oidc-proxy". A proxy scraped under
+# another job name matches none of them, and a rule that matches nothing never
+# fires, so keep that job name or change it here throughout.
+# OzoneOIDCProxyNotScraped exists to catch that mistake.
+#
+# Rates are taken over five minutes, and every rule built on a rate waits at
+# least that long before firing, so a single failed request never pages
+# anyone. The thresholds are starting points, to be tuned against real
+# traffic.
+#
+# The lanes' counters carry the same labels once rate() drops the metric
+# name, so they are told apart with a lane label before being combined. A
+# plain `or` would otherwise keep one lane and silently discard the other.
+groups:
+  - name: ozone-oidc-proxy
+    rules:
+      - alert: OzoneOIDCProxyNotScraped
+        expr: absent(up{job="ozone-oidc-proxy"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: No ozone-oidc-proxy target is being scraped.
+          description: >-
+            Prometheus has no target in job ozone-oidc-proxy, so none of the
+            proxy's other alerts can fire. Check the scrape configuration, and
+            the job name these rules select.
+
+      - alert: OzoneOIDCProxyDown
+        expr: up{job="ozone-oidc-proxy"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Proxy {{ $labels.instance }} is not answering scrapes.
+          description: >-
+            The admin listener of {{ $labels.instance }} has not answered for
+            two minutes. Clients sent to this replica are failing, and nothing
+            it would report is being seen.
+
+      - alert: OzoneOIDCProxyCredentialStoreDown
+        expr: credential_store_up{job="ozone-oidc-proxy"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Proxy {{ $labels.instance }} cannot read its credential store.
+          description: >-
+            Token exchanges and SigV4 requests fail on {{ $labels.instance }}
+            while the store cannot be read; bearer requests do not use it.
+            Check that valkey is running and reachable from the proxy.
+
+      - alert: OzoneOIDCProxyCredentialStoreErrors
+        expr: |
+          sum by (instance) (
+              label_replace(rate(sigv4_verifications_total{job="ozone-oidc-proxy", result="store_error"}[5m]), "lane", "sigv4", "", "")
+            or
+              label_replace(rate(presigned_verifications_total{job="ozone-oidc-proxy", result="store_error"}[5m]), "lane", "presigned", "", "")
+            or
+              label_replace(rate(sts_exchanges_total{job="ozone-oidc-proxy", result="ServiceFailure"}[5m]), "lane", "sts", "", "")
+          ) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Requests on {{ $labels.instance }} are failing on credential store errors.
+          description: >-
+            The store answers the proxy's scrape but fails requests: token
+            exchanges cannot save credentials, or verifications cannot read
+            them. A valkey that is out of memory rejects writes while still
+            serving reads.
+
+      - alert: OzoneOIDCProxyIssuerUnreachable
+        expr: |
+          sum by (instance) (
+              rate(sts_exchanges_total{job="ozone-oidc-proxy", result="IDPCommunicationError"}[5m])
+            or
+              rate(bearer_auth_total{job="ozone-oidc-proxy", result="ServiceUnavailable"}[5m])
+          ) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Proxy {{ $labels.instance }} cannot reach an identity provider.
+          description: >-
+            Tokens cannot be verified because an issuer's discovery document
+            or signing keys cannot be fetched. No new credentials are being
+            issued; credentials already issued keep working until they
+            expire. Check the issuer, and that the egress policy admits it.
+
+      - alert: OzoneOIDCProxyTokenExchangesRejected
+        expr: |
+          (
+            sum by (instance, result) (rate(sts_exchanges_total{job="ozone-oidc-proxy", result!~"success|IDPCommunicationError|ServiceFailure"}[5m]))
+            / ignoring (result) group_left
+            sum by (instance) (rate(sts_exchanges_total{job="ozone-oidc-proxy"}[5m]))
+          ) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of token exchanges on {{ $labels.instance }} are rejected with {{ $labels.result }}.'
+          description: >-
+            InvalidIdentityToken usually means an audience or issuer that no
+            longer matches after a change at the identity provider;
+            ExpiredTokenException, clients presenting stale tokens or a clock
+            problem; AccessDenied, a role ARN outside the allowlist.
+
+      - alert: OzoneOIDCProxyRequestsRejected
+        expr: |
+          (
+              label_replace(
+                sum by (instance, result) (rate(sigv4_verifications_total{job="ozone-oidc-proxy", result!~"success|expired|store_error"}[5m]))
+                / ignoring (result) group_left
+                sum by (instance) (rate(sigv4_verifications_total{job="ozone-oidc-proxy"}[5m])),
+                "lane", "sigv4", "", "")
+            or
+              label_replace(
+                sum by (instance, result) (rate(presigned_verifications_total{job="ozone-oidc-proxy", result!~"success|expired|url_expired|store_error"}[5m]))
+                / ignoring (result) group_left
+                sum by (instance) (rate(presigned_verifications_total{job="ozone-oidc-proxy"}[5m])),
+                "lane", "presigned", "", "")
+            or
+              label_replace(
+                sum by (instance, result) (rate(bearer_auth_total{job="ozone-oidc-proxy", result!~"success|ExpiredToken|ServiceUnavailable"}[5m]))
+                / ignoring (result) group_left
+                sum by (instance) (rate(bearer_auth_total{job="ozone-oidc-proxy"}[5m])),
+                "lane", "bearer", "", "")
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of {{ $labels.lane }} requests on {{ $labels.instance }} are rejected as {{ $labels.result }}.'
+          description: >-
+            skew means a clock problem, on the clients or on the proxy's host;
+            mismatch, usually a Host header rewritten between the client and
+            the proxy, or a client holding the wrong secret; unknown_akid,
+            credentials lost with the memory store on a restart, or a revoked
+            credential still in use; AccessDenied on the bearer lane, tokens
+            that no longer match an issuer's audience.
+
+      - alert: OzoneOIDCProxyUpstreamUnreachable
+        expr: sum by (instance) (rate(upstream_errors_total{job="ozone-oidc-proxy"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: The S3 Gateway is not answering proxy {{ $labels.instance }}.
+          description: >-
+            Requests are reaching the proxy, passing authentication, and
+            getting no response from the S3 Gateway, so the proxy answers
+            them with 502. Check the gateway, and that the proxy's egress
+            policy still admits it.
+
+      - alert: OzoneOIDCProxyUpstreamErrors
+        expr: |
+          (
+            sum by (instance) (rate(upstream_requests_total{job="ozone-oidc-proxy", code=~"5.."}[5m]))
+            /
+            sum by (instance) (rate(upstream_requests_total{job="ozone-oidc-proxy"}[5m]))
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of S3 Gateway responses to {{ $labels.instance }} are server errors.'
+          description: >-
+            These are Ozone's own answers, not the proxy's: the gateway is up
+            but failing requests. Look at the Ozone Manager and the
+            Datanodes behind it.
+
+      - alert: OzoneOIDCProxyVerificationSlow
+        expr: |
+          histogram_quantile(0.99,
+            sum by (instance, lane, le) (rate(verification_duration_seconds_bucket{job="ozone-oidc-proxy", lane=~"sigv4|presigned"}[5m]))
+          ) > 0.001
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.lane }} verification p99 on {{ $labels.instance }} is {{ $value | humanizeDuration }}.'
+          description: >-
+            Signature verification is meant to stay under 1 ms at the 99th
+            percentile. This is the proxy's own overhead, separate from time
+            spent in Ozone: look for CPU starvation, or a slow credential
+            store.

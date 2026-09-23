@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Monitoring overlay (architecture.md): Prometheus scrapes the proxy's
-# :9090 /metrics; Grafana auto-provisions the datasource and the committed
-# dashboard (dashboards/ozone-oidc-proxy.json). Usage:
+# :9090 /metrics and evaluates the alert rules in alerts/; Grafana
+# auto-provisions the datasource and the committed dashboard
+# (dashboards/ozone-oidc-proxy.json). Usage:
 #
 #   make monitor-up     # docker compose -f docker-compose.yml -f docker-compose.monitor.yml ...
 #
@@ -18,6 +19,7 @@ services:
       - --storage.tsdb.retention.time=6h
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../alerts:/etc/prometheus/alerts:ro
     # Internal only by default; expose for ad-hoc PromQL if you want it.
     expose:
       - "9090"

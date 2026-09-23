@@ -1,0 +1,28 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# blackbox_exporter modules for the two checks that fail silently open when
+# a policy is edited carelessly. ozone-oidc-proxy-probes.rules.yml alerts on
+# their results; operations.md shows the scrape jobs that run them.
+modules:
+  # An anonymous request must be refused by the proxy itself, and a 403 does
+  # not show that: with strict mode off the request reaches Ozone, which
+  # refuses it with a 403 of its own. Only the proxy's message is conclusive,
+  # so the body is matched on it.
+  ozpx_anonymous_refused:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_status_codes: [403]
+      follow_redirects: false
+      fail_if_body_not_matches_regexp:
+        - "<Code>AccessDenied</Code>"
+        - "<Message>authentication required"
+
+  # A plain connection attempt. Nothing about the module makes it a negative
+  # check: that comes from where the exporter runs, outside the path the S3
+  # Gateway is meant to accept, and from the alert firing on success.
+  ozpx_tcp_connect:
+    prober: tcp
+    timeout: 5s

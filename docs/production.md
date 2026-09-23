@@ -47,16 +47,21 @@ migration path: [upstream.md](upstream.md).
 - [ ] **A negative probe in monitoring**: an anonymous request to the proxy
   must return 403, and a direct request to the S3 Gateway from outside the
   sanctioned path must not connect at all. Both are cheap to alert on and
-  both fail silently open if someone edits the wrong policy.
+  both fail silently open if someone edits the wrong policy. Both ship as
+  blackbox modules with alert rules in `alerts/`; the bypass probe only
+  means something when run from outside that path, which
+  [operations.md](operations.md#the-two-probes) covers.
 
 ## Should-have
 
 - [ ] **Durable authentication audit.** The proxy log *is* the auth audit
   trail (usernames, AKIDs, issuers, error codes, never secrets). Ship it
   (Loki/ELK) with retention; correlate with the OM audit log by username.
-- [ ] **Alert rules** on the metrics already exported: verification-failure
-  spikes, `store_error`s, issuer unreachable (STS 503s), replica down,
-  upstream 5xx rate. The Grafana dashboard shows them; alerts act on them.
+- [ ] **Load the alert rules** shipped in `alerts/`: a replica down, the
+  credential store unreadable or failing requests, an issuer unreachable,
+  rejection spikes by lane and result, the S3 Gateway not answering or
+  answering with server errors, and slow verification. The Grafana
+  dashboard shows the same signals; the rules act on them.
 - [ ] **A valkey availability stance.** Either operate valkey replicated
   (Sentinel/managed), or explicitly accept "store loss ⇒ all clients
   re-exchange a token", defensible for short-lived credentials, but write

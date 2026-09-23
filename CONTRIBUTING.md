@@ -51,10 +51,12 @@ make up         # start the compose stack (Keycloak + Ozone + proxy)
 make init       # provision the Keycloak realm/users and the /s3v volume ACLs
 make e2e        # end-to-end suite against that stack
 make lint-docs  # markdownlint over the docs (requires Node)
+make alerts-check  # promtool tests for alerts/, and the probe modules' config check (Docker)
 make help       # list all targets, including the optional overlays
 ```
 
-Run `make check` before every commit; CI runs the same gates.
+Run `make check` before every commit, and `make alerts-check` as well when
+`alerts/` changes; CI runs both.
 
 ## Testing policy
 
@@ -78,6 +80,8 @@ What that means in practice:
 - Changes to lane dispatch, forwarding or ACL behaviour get a case in the
   `make e2e` suite, which runs against a real Ozone cluster. Assert the state
   you expect (bucket owner, S3 error code), not merely that a command exited 0.
+- Alert rules come with promtool tests beside them: each alert shown firing
+  on the condition it names, and quiet on the nearest one that must not page.
 - Live verification results belong in [docs/verification.md](docs/verification.md)
   with the date and what was run.
 

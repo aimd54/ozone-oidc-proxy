@@ -1,0 +1,73 @@
+# Copyright The ozone-oidc-proxy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Alerts on the two probes defined in blackbox.yml. They live apart from
+# ozone-oidc-proxy.rules.yml because they need a blackbox_exporter and two
+# scrape jobs, named as below; loaded without those, the not-reporting rule
+# fires, which is the intended failure.
+#
+#   ozone-oidc-proxy-anonymous  module ozpx_anonymous_refused, target the
+#                               proxy's S3 endpoint as clients reach it
+#   ozone-oidc-proxy-bypass     module ozpx_tcp_connect, target the S3
+#                               Gateway's host:port, probed from outside the
+#                               path that is allowed to reach it
+#
+# The bypass alert fires when the probe succeeds. A probe that fails for any
+# reason at all looks like a gateway that refused it, so two further rules
+# guard it: one for a probe that is not reporting, one for a target name that
+# does not resolve.
+groups:
+  - name: ozone-oidc-proxy-probes
+    rules:
+      - alert: OzoneOIDCProxyAcceptsAnonymousRequests
+        expr: probe_success{job="ozone-oidc-proxy-anonymous"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.instance }} did not refuse an anonymous request.'
+          description: >-
+            An unauthenticated request did not get the proxy's own 403. Either
+            the proxy cannot be reached from the probe, or it is passing
+            anonymous requests to Ozone: check that data_path.strict has not
+            been turned off.
+
+      - alert: OzoneS3GatewayReachableBypassingProxy
+        expr: probe_success{job="ozone-oidc-proxy-bypass"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: The S3 Gateway at {{ $labels.instance }} accepts connections that bypass the proxy.
+          description: >-
+            The gateway authenticates nobody, so anything that can connect to
+            it can act as any user. The network policy confining it to the
+            proxy is missing, not enforced, or has been widened.
+
+      - alert: OzoneOIDCProxyProbeNotReporting
+        expr: |
+          absent(probe_success{job="ozone-oidc-proxy-anonymous"})
+          or
+          absent(probe_success{job="ozone-oidc-proxy-bypass"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The {{ $labels.job }} probe is not reporting.
+          description: >-
+            Prometheus has no result for this probe, so the boundary it
+            watches is not being checked. Check the blackbox exporter and the
+            scrape job.
+
+      - alert: OzoneOIDCProxyBypassProbeUnresolved
+        expr: probe_ip_protocol{job="ozone-oidc-proxy-bypass"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The bypass probe cannot resolve {{ $labels.instance }}.
+          description: >-
+            A connection that fails because the name does not resolve looks
+            the same as one the gateway refused, so this probe is passing
+            without testing anything. Give it the name clients of the gateway
+            would use.
